@@ -1,0 +1,3 @@
+ [MQTT]
+ host = <MQTT Host>
+ topic  = <Topic Prefix>
