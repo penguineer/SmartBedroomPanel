@@ -19,6 +19,8 @@ from threading import Timer, Thread, Event
 from kivy.app import App
 from kivy.uix.widget import Widget
 from kivy.graphics import Color, Rectangle
+from kivy.core.text import Label as CoreLabel
+from kivy.uix.label import Label
 
 import paho.mqtt.client as mqtt
 
@@ -57,6 +59,7 @@ class BacklightTimer():
         
         return dimmed
 
+
 def on_mqtt_state(client, userdata, message):
     userdata.set_pwr_state(str(message.payload)[2:-1])
 
@@ -72,10 +75,19 @@ class SmartPanelWidget(Widget):
         self.mqtt.user_data_set(self)
         self.mqtt.message_callback_add(MQTT_SW_TOPIC+"/POWER", on_mqtt_state)
 
+        mylabel = CoreLabel(text="Hi there!", font_size=25, color=(0, 0.50, 0.50, 1))
+        mylabel.refresh()
+        texture = mylabel.texture
+        texture_size = list(texture.size)
+        
         with self.canvas:
             # instr. for main canvas
             Color(1, 0, 0, 1, mode='rgba')
-            Rectangle(pos=self.pos, size=(100,100))
+            Rectangle(pos=(50, 50), size=(100,100))
+            Rectangle(pos=(250, 50), size=(100,100))
+        
+        self.add_widget(Label(pos=(50,150), text="Bed Room", font_size='20sp', color=(1, 1, 0, 1)))
+        self.add_widget(Label(pos=(250,150), text="Living Room", font_size='20sp', color=(1, 1, 0, 1)))
         
         #with self.canvas.before:
             # rendered before
@@ -102,7 +114,7 @@ class SmartPanelWidget(Widget):
                 Color(1, 0, 0, 1, mode='rgba')
         
         with self.canvas:
-            Rectangle(pos=self.pos, size=(100,100))
+            Rectangle(pos=(50,50), size=(100,100))
         
 
 
