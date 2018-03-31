@@ -60,48 +60,91 @@ class BacklightTimer():
         return dimmed
 
 
+class Thing():
+    def __init__(self, key, cfg, mqtt, widget):
+        self.key = key
+        self.cfg = cfg
+        self.mqtt = mqtt
+        self.widget = widget
+    
+    def init(self):
+        print("initializing thing", self.key)
+        section = "Thing:"+self.key
+        
+        self.name = self.cfg.get(section, "name")
+        self.tp = self.cfg.get(section, "type")
+        self.topic = self.cfg.get(section, "topic")
+
+        posX = int(self.cfg.get(section, "posX"))
+        self.position = (posX, 50)
+        self.size = (100, 100)
+        
+        self.widget.add_widget(
+            Label(pos=(self.position[0],150), text=self.name, font_size='20sp', color=(1, 1, 0, 1)))
+        
+        with self.widget.canvas:
+            Color(1, 0, 0, 1, mode='rgba')
+            Rectangle(pos=self.position, size=self.size)
+        
+        return
+
+
 def on_mqtt_state(client, userdata, message):
     userdata.set_pwr_state(str(message.payload)[2:-1])
 
 class SmartPanelWidget(Widget):
-    def __init__(self, backlight, mqtt, **kwargs):
+    def __init__(self, backlight, mqtt, cfg, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
         
         self.back_tmr = backlight
         self.back_tmr.turn_on()
         self.back_tmr.start()
         
+        self.cfg = cfg
+        
         self.mqtt = mqtt
         self.mqtt.user_data_set(self)
         self.mqtt.message_callback_add(MQTT_SW_TOPIC+"/POWER", on_mqtt_state)
+
+        # Initialize the things
+        self.things = []
+        for sec in filter(lambda s: s.startswith("Thing:"),
+                          self.cfg.sections()):
+            t = Thing(sec[6:], self.cfg, self.mqtt, self)
+            t.init()
+            self.things.append(t)
 
         mylabel = CoreLabel(text="Hi there!", font_size=25, color=(0, 0.50, 0.50, 1))
         mylabel.refresh()
         texture = mylabel.texture
         texture_size = list(texture.size)
         
-        with self.canvas:
-            # instr. for main canvas
-            Color(1, 0, 0, 1, mode='rgba')
-            Rectangle(pos=(50, 50), size=(100,100))
-            Rectangle(pos=(250, 50), size=(100,100))
+        self.repaint_canvas()
         
-        self.add_widget(Label(pos=(50,150), text="Bed Room", font_size='20sp', color=(1, 1, 0, 1)))
-        self.add_widget(Label(pos=(250,150), text="Living Room", font_size='20sp', color=(1, 1, 0, 1)))
-        
-        #with self.canvas.before:
-            # rendered before
-        
-        #with self.canvas.after:
-            # rendered after
-        
+    
     
     def on_touch_down(self, touch):
         if not self.back_tmr.reset():
             pos = touch.pos
             print("Touch at ", pos)
             
-            self.mqtt.publish(MQTT_SW_TOPIC+"/cmnd/Power1", "TOGGLE", qos=2)
+            thing = None
+            for t in self.things:
+                if ((pos[0] > t.position[0]) and
+                   (pos[1] > t.position[1]) and
+                   (pos[0] < t.position[0] + t.size[0]) and
+                   (pos[1] < t.position[1] + t.size[1])):
+                    thing = t;
+                    break;
+            
+            if not thing == None:
+                print("Match at thing", thing.name)
+                
+                self.mqtt.publish(thing.topic+"/cmnd/Power1", "TOGGLE", qos=2)
+                
+                if thing.tp == "TASMOTA WS2812":
+                    sleep(1)
+                    self.mqtt.publish(thing.topic+"/cmnd/Power3", "TOGGLE", qos=2)
         
         return True
 
@@ -115,6 +158,12 @@ class SmartPanelWidget(Widget):
         
         with self.canvas:
             Rectangle(pos=(50,50), size=(100,100))
+    
+    def repaint_canvas(self):
+        with self.canvas:
+            Color(1, 0, 0, 1, mode='rgba')
+            Rectangle(pos=(50, 50), size=(100,100))
+            Rectangle(pos=(250, 50), size=(100,100))
         
 
 
@@ -133,7 +182,7 @@ class SmartPanelApp(App):
         self.back_tmr = BacklightTimer(timeout = int(timeout_s), 
                                        brightness = int(brightness_s))
         
-        widget = SmartPanelWidget(self.back_tmr, self.mqtt)
+        widget = SmartPanelWidget(self.back_tmr, self.mqtt, self.cfg)
         
         return widget
 
