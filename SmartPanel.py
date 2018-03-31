@@ -119,13 +119,19 @@ class SmartPanelWidget(Widget):
 
 
 class SmartPanelApp(App):
-    def __init__(self, mqtt, **kwargs):
+    def __init__(self, mqtt, cfg, **kwargs):
         super(SmartPanelApp, self).__init__(**kwargs)
         
         self.mqtt = mqtt
+        self.cfg = cfg
+    
     
     def build(self):
-        self.back_tmr = BacklightTimer(10)
+        timeout_s = self.cfg.get("Backlight", "timeout")
+        brightness_s = self.cfg.get("Backlight", "brightness")
+        
+        self.back_tmr = BacklightTimer(timeout = int(timeout_s), 
+                                       brightness = int(brightness_s))
         
         widget = SmartPanelWidget(self.back_tmr, self.mqtt)
         
@@ -151,10 +157,10 @@ if __name__ == '__main__':
     
     config = configparser.ConfigParser()
     config.read("smartpanel.cfg")
+    
     MQTT_HOST = config.get("MQTT", "host");
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
     
-
     bl.set_power(True)
     bl.set_brightness(128)
     
@@ -163,7 +169,7 @@ if __name__ == '__main__':
     client.subscribe(MQTT_SW_TOPIC+"/#")
     client.loop_start()
     
-    app = SmartPanelApp(client)
+    app = SmartPanelApp(client, config)
     app.run()
     
     client.loop_stop()
