@@ -26,9 +26,9 @@ import paho.mqtt.client as mqtt
 
 class BacklightTimer():
 
-    def __init__(self, t):
-        self.t = t
-        self.timer = Timer(self.t, self.handle_timer)
+    def __init__(self, timeout=30, brightness=128):
+        self.timeout = timeout
+        self.brightness = brightness
     
     def handle_timer(self):
         print("Backlight timeout")
@@ -37,6 +37,7 @@ class BacklightTimer():
         bl.set_power(False)
     
     def start(self):
+        self.timer = Timer(self.timeout, self.handle_timer)
         self.timer.start()
     
     def cancel(self):
@@ -44,7 +45,7 @@ class BacklightTimer():
         
     def turn_on(self):
         bl.set_power(True)
-        bl.set_brightness(128, smooth=True, duration=0.5)
+        bl.set_brightness(self.brightness, smooth=True, duration=0.5)
         
     def reset(self):
         self.timer.cancel()
@@ -54,8 +55,7 @@ class BacklightTimer():
         if dimmed:
             self.turn_on()
         
-        self.timer = Timer(self.t, self.handle_timer)
-        self.timer.start()
+        self.start()
         
         return dimmed
 

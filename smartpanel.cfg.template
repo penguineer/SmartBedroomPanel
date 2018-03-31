@@ -1,3 +1,7 @@
  [MQTT]
  host = <MQTT Host>
  topic  = <Topic Prefix>
+
+ [Backlight]
+ timeout = 30
+ brightness = 128
