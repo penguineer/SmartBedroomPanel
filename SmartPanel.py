@@ -21,6 +21,7 @@ from kivy.uix.widget import Widget
 from kivy.graphics import Color, Rectangle
 from kivy.core.text import Label as CoreLabel
 from kivy.uix.label import Label
+from kivy.uix.image import Image
 
 import paho.mqtt.client as mqtt
 
@@ -119,7 +120,41 @@ class SmartPanelWidget(Widget):
         texture = mylabel.texture
         texture_size = list(texture.size)
         
+        IMGDIR="resources/nixie/"
+        clock_pos = (300, 250)
+        self.clock_img = []
+        # Hour 1
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+0*(88+5), clock_pos[1]),
+                        source=IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Hour 2
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+1*(88+5), clock_pos[1]),
+                        source=IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Minute 1
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+20+2*(88+5), clock_pos[1]),
+                        source=IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Minute 2
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+20+3*(88+5), clock_pos[1]),
+                        source=IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        
+        for img in self.clock_img:
+            self.add_widget(img)
+        
         self.repaint_canvas()
+        
+    
+    def set_clock(self):
         
     
     
