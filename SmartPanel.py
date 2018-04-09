@@ -154,7 +154,7 @@ class SmartPanelWidget(Widget):
         for img in self.clock_img:
             self.add_widget(img)
         
-        Clock.schedule_interval(self.set_clock, 5)
+        Clock.schedule_interval(self.set_clock, 1)
         
         self.repaint_canvas()
         
@@ -163,13 +163,14 @@ class SmartPanelWidget(Widget):
     def set_clock(self, dt):
         datestr = str(datetime.now())
         
-        self.clock_img[0].source=self.IMGDIR+datestr[11]+".png"
-        self.clock_img[1].source=self.IMGDIR+datestr[12]+".png"
-        self.clock_img[2].source=self.IMGDIR+datestr[14]+".png"
-        self.clock_img[3].source=self.IMGDIR+datestr[15]+".png"
+        ds = datestr[11:13] + datestr[14:16]
         
-        for img in self.clock_img:
-            img.reload()
+        for i in range(0,4):
+            src = self.IMGDIR+ds[i]+".png"
+            
+            if not src == self.clock_img[i].source:
+                self.clock_img[i].source=src
+                self.clock_img[i].reload()
     
     
     def on_touch_down(self, touch):
