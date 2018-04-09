@@ -11,6 +11,7 @@ import queue
 from time import sleep
 import signal
 import sys
+from datetime import datetime
 
 import configparser
 
@@ -21,6 +22,9 @@ from kivy.uix.widget import Widget
 from kivy.graphics import Color, Rectangle
 from kivy.core.text import Label as CoreLabel
 from kivy.uix.label import Label
+from kivy.uix.image import Image
+
+from kivy.clock import Clock
 
 import paho.mqtt.client as mqtt
 
@@ -119,8 +123,54 @@ class SmartPanelWidget(Widget):
         texture = mylabel.texture
         texture_size = list(texture.size)
         
+        self.IMGDIR="resources/nixie/"
+        clock_pos = (300, 250)
+        self.clock_img = []
+        # Hour 1
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+0*(88+5), clock_pos[1]),
+                        source=self.IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Hour 2
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+1*(88+5), clock_pos[1]),
+                        source=self.IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Minute 1
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+20+2*(88+5), clock_pos[1]),
+                        source=self.IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Minute 2
+        self.clock_img.append(
+            Image(pos=(clock_pos[0]+20+3*(88+5), clock_pos[1]),
+                        source=self.IMGDIR+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        
+        for img in self.clock_img:
+            self.add_widget(img)
+        
+        Clock.schedule_interval(self.set_clock, 1)
+        
         self.repaint_canvas()
         
+    
+    
+    def set_clock(self, dt):
+        datestr = str(datetime.now())
+        
+        ds = datestr[11:13] + datestr[14:16]
+        
+        for i in range(0,4):
+            src = self.IMGDIR+ds[i]+".png"
+            
+            if not src == self.clock_img[i].source:
+                self.clock_img[i].source=src
+                self.clock_img[i].reload()
     
     
     def on_touch_down(self, touch):
