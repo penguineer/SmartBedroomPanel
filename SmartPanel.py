@@ -24,6 +24,8 @@ from kivy.core.text import Label as CoreLabel
 from kivy.uix.label import Label
 from kivy.uix.image import Image
 
+from kivy.clock import Clock
+
 import paho.mqtt.client as mqtt
 
 class BacklightTimer():
@@ -152,14 +154,15 @@ class SmartPanelWidget(Widget):
         for img in self.clock_img:
             self.add_widget(img)
         
+        Clock.schedule_interval(self.set_clock, 5)
+        
         self.repaint_canvas()
         
     
     
-    def set_clock(self):
+    def set_clock(self, dt):
         datestr = str(datetime.now())
         
-        print(datestr)
         self.clock_img[0].source=self.IMGDIR+datestr[11]+".png"
         self.clock_img[1].source=self.IMGDIR+datestr[12]+".png"
         self.clock_img[2].source=self.IMGDIR+datestr[14]+".png"
