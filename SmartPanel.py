@@ -24,6 +24,7 @@ from kivy.core.text import Label as CoreLabel
 from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.uix.relativelayout import RelativeLayout
+from kivy.uix.boxlayout import BoxLayout
 
 from kivy.clock import Clock
 
@@ -99,45 +100,24 @@ class Thing():
 def on_mqtt_state(client, userdata, message):
     userdata.set_pwr_state(str(message.payload)[2:-1])
 
-class ClockWidget(RelativeLayout):
+class ClockWidget(BoxLayout):
     def __init__(self, cfg, basepath, **kwargs):
+        self.orientation = 'horizontal'
+        self.spacing = self.size[0]*0.01
         super(ClockWidget, self).__init__(**kwargs)
         self.cfg = cfg
         
         self.basepath = basepath
         
-        gap = 0
-        middle = 20
-        
         self.clock_img = []
-        # Hour 1
-        self.clock_img.append(
-            Image(pos=(0*(88+gap), 0),
-                        source=self.basepath+"off.png",
-                        size_hint=(None, None),
-                        size=(88, 150)))
-        # Hour 2
-        self.clock_img.append(
-            Image(pos=(1*(88+gap), 0),
-                        source=self.basepath+"off.png",
-                        size_hint=(None, None),
-                        size=(88, 150)))
-        # Minute 1
-        self.clock_img.append(
-            Image(pos=(middle+2*(88+gap), 0),
-                        source=self.basepath+"off.png",
-                        size_hint=(None, None),
-                        size=(88, 150)))
-        # Minute 2
-        self.clock_img.append(
-            Image(pos=(middle+3*(88+gap), 0),
-                        source=self.basepath+"off.png",
-                        size_hint=(None, None),
-                        size=(88, 150)))
-        
-        for img in self.clock_img:
+        for i in range(0,4):
+            img = Image(source=self.basepath+"off.png")
+            self.clock_img.append(img)
             self.add_widget(img)
-        
+            if i == 1:
+                self.add_widget(
+                    Widget(size=(self.size[0]*0.05, 1), 
+                           size_hint=(None, 1)))
         
         Clock.schedule_interval(self.set_clock, 1)
 
@@ -181,7 +161,8 @@ class SmartPanelWidget(RelativeLayout):
         clock_pos = (380, 280)
         
         self.clock = ClockWidget(self.cfg, self.IMGDIR, 
-                                 pos=clock_pos)
+                                 pos=clock_pos, size=(370, 150),
+                                 size_hint=(None, None))
         self.add_widget(self.clock)
         
         self.repaint_canvas()
