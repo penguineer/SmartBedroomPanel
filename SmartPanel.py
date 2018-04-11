@@ -23,6 +23,8 @@ from kivy.graphics import Color, Rectangle
 from kivy.core.text import Label as CoreLabel
 from kivy.uix.label import Label
 from kivy.uix.image import Image
+from kivy.uix.relativelayout import RelativeLayout
+from kivy.uix.boxlayout import BoxLayout
 
 from kivy.clock import Clock
 
@@ -84,7 +86,9 @@ class Thing():
         self.size = (100, 100)
         
         self.widget.add_widget(
-            Label(pos=(self.position[0],150), text=self.name, font_size='20sp', color=(1, 1, 0, 1)))
+            Label(pos=(self.position[0],150), text=self.name,
+                  font_size='20sp', color=(1, 1, 0, 1),
+                  size_hint=(None, None)))
         
         with self.widget.canvas:
             Color(1, 0, 0, 1, mode='rgba')
@@ -96,7 +100,42 @@ class Thing():
 def on_mqtt_state(client, userdata, message):
     userdata.set_pwr_state(str(message.payload)[2:-1])
 
-class SmartPanelWidget(Widget):
+class ClockWidget(BoxLayout):
+    def __init__(self, cfg, basepath, **kwargs):
+        self.orientation = 'horizontal'
+        self.spacing = self.size[0]*0.01
+        super(ClockWidget, self).__init__(**kwargs)
+        self.cfg = cfg
+        
+        self.basepath = basepath
+        
+        self.clock_img = []
+        for i in range(0,4):
+            img = Image(source=self.basepath+"off.png")
+            self.clock_img.append(img)
+            self.add_widget(img)
+            if i == 1:
+                self.add_widget(
+                    Widget(size=(self.size[0]*0.05, 1), 
+                           size_hint=(None, 1)))
+        
+        Clock.schedule_interval(self.set_clock, 1)
+
+
+    def set_clock(self, dt):
+        datestr = str(datetime.now())
+        
+        ds = datestr[11:13] + datestr[14:16]
+        
+        for i in range(0,4):
+            src = self.basepath+ds[i]+".png"
+            
+            if not src == self.clock_img[i].source:
+                self.clock_img[i].source=src
+                self.clock_img[i].reload()
+
+
+class SmartPanelWidget(RelativeLayout):
     def __init__(self, backlight, mqtt, cfg, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
         
@@ -118,59 +157,16 @@ class SmartPanelWidget(Widget):
             t.init()
             self.things.append(t)
 
-        mylabel = CoreLabel(text="Hi there!", font_size=25, color=(0, 0.50, 0.50, 1))
-        mylabel.refresh()
-        texture = mylabel.texture
-        texture_size = list(texture.size)
-        
         self.IMGDIR="resources/nixie/"
-        clock_pos = (300, 250)
-        self.clock_img = []
-        # Hour 1
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+0*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
-        # Hour 2
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+1*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
-        # Minute 1
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+20+2*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
-        # Minute 2
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+20+3*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
+        clock_pos = (380, 280)
         
-        for img in self.clock_img:
-            self.add_widget(img)
-        
-        Clock.schedule_interval(self.set_clock, 1)
+        self.clock = ClockWidget(self.cfg, self.IMGDIR, 
+                                 pos=clock_pos, size=(370, 150),
+                                 size_hint=(None, None))
+        self.add_widget(self.clock)
         
         self.repaint_canvas()
         
-    
-    
-    def set_clock(self, dt):
-        datestr = str(datetime.now())
-        
-        ds = datestr[11:13] + datestr[14:16]
-        
-        for i in range(0,4):
-            src = self.IMGDIR+ds[i]+".png"
-            
-            if not src == self.clock_img[i].source:
-                self.clock_img[i].source=src
-                self.clock_img[i].reload()
     
     
     def on_touch_down(self, touch):
@@ -232,7 +228,8 @@ class SmartPanelApp(App):
         self.back_tmr = BacklightTimer(timeout = int(timeout_s), 
                                        brightness = int(brightness_s))
         
-        widget = SmartPanelWidget(self.back_tmr, self.mqtt, self.cfg)
+        widget = SmartPanelWidget(self.back_tmr, self.mqtt, self.cfg,
+                                  pos = (0,0), size = (800, 480))
         
         return widget
 
