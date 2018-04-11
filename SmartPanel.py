@@ -96,6 +96,58 @@ class Thing():
 def on_mqtt_state(client, userdata, message):
     userdata.set_pwr_state(str(message.payload)[2:-1])
 
+class ClockWidget(Widget):
+    def __init__(self, cfg, basepath, **kwargs):
+        super(ClockWidget, self).__init__(**kwargs)
+        self.cfg = cfg
+        
+        self.basepath = basepath
+        
+        self.clock_img = []
+        # Hour 1
+        self.clock_img.append(
+            Image(pos=(0*(88+5), 0),
+                        source=self.basepath+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Hour 2
+        self.clock_img.append(
+            Image(pos=(1*(88+5), 0),
+                        source=self.basepath+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Minute 1
+        self.clock_img.append(
+            Image(pos=(20+2*(88+5), 0),
+                        source=self.basepath+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        # Minute 2
+        self.clock_img.append(
+            Image(pos=(20+3*(88+5), 0),
+                        source=self.basepath+"off.png",
+                        size=(200, 172),
+                        allow_stretch="false"))
+        
+        for img in self.clock_img:
+            self.add_widget(img)
+        
+        Clock.schedule_interval(self.set_clock, 1)
+
+
+    def set_clock(self, dt):
+        datestr = str(datetime.now())
+        
+        ds = datestr[11:13] + datestr[14:16]
+        
+        for i in range(0,4):
+            src = self.basepath+ds[i]+".png"
+            
+            if not src == self.clock_img[i].source:
+                self.clock_img[i].source=src
+                self.clock_img[i].reload()
+
+
 class SmartPanelWidget(Widget):
     def __init__(self, backlight, mqtt, cfg, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
