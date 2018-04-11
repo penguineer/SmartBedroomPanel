@@ -177,52 +177,12 @@ class SmartPanelWidget(Widget):
         
         self.IMGDIR="resources/nixie/"
         clock_pos = (300, 250)
-        self.clock_img = []
-        # Hour 1
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+0*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
-        # Hour 2
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+1*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
-        # Minute 1
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+20+2*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
-        # Minute 2
-        self.clock_img.append(
-            Image(pos=(clock_pos[0]+20+3*(88+5), clock_pos[1]),
-                        source=self.IMGDIR+"off.png",
-                        size=(200, 172),
-                        allow_stretch="false"))
         
-        for img in self.clock_img:
-            self.add_widget(img)
-        
-        Clock.schedule_interval(self.set_clock, 1)
+        self.clock = ClockWidget(self.cfg, self.IMGDIR, pos=clock_pos)
+        self.add_widget(self.clock)
         
         self.repaint_canvas()
         
-    
-    
-    def set_clock(self, dt):
-        datestr = str(datetime.now())
-        
-        ds = datestr[11:13] + datestr[14:16]
-        
-        for i in range(0,4):
-            src = self.IMGDIR+ds[i]+".png"
-            
-            if not src == self.clock_img[i].source:
-                self.clock_img[i].source=src
-                self.clock_img[i].reload()
     
     
     def on_touch_down(self, touch):
