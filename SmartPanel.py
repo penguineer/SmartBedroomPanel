@@ -30,6 +30,21 @@ from kivy.clock import Clock
 
 import paho.mqtt.client as mqtt
 
+
+
+MQTT_TOPICS = []
+
+
+def on_mqtt_connect(client, userdata, flags, rc):
+    print("Connected with code %s" % rc)
+    for topic in MQTT_TOPICS:
+        client.subscribe(topic)
+
+
+def on_mqtt_state(client, userdata, message):
+    userdata.set_pwr_state(str(message.payload)[2:-1])
+
+
 class BacklightTimer():
 
     def __init__(self, timeout=30, brightness=128):
@@ -96,17 +111,6 @@ class Thing():
         
         return
 
-MQTT_TOPICS = []
-
-
-def on_mqtt_connect(client, userdata, flags, rc):
-    print("Connected with code %s" % rc)
-    for topic in MQTT_TOPICS:
-        client.subscribe(topic)
-
-
-def on_mqtt_state(client, userdata, message):
-    userdata.set_pwr_state(str(message.payload)[2:-1])
 
 class ClockWidget(BoxLayout):
     def __init__(self, cfg, basepath, **kwargs):
