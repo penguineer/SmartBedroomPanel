@@ -30,6 +30,26 @@ from kivy.clock import Clock
 
 import paho.mqtt.client as mqtt
 
+
+
+MQTT_TOPICS = []
+
+
+def on_mqtt_connect(client, userdata, flags, rc):
+    print("Connected with code %s" % rc)
+    for topic in MQTT_TOPICS:
+        client.subscribe(topic)
+
+
+def on_mqtt_state(client, userdata, message):
+    topic = message.topic
+    state = str(message.payload)[2:-1]
+    
+    print("Power {s} for {t}".format(t=topic, s=state))
+    
+    userdata.set_pwr_state(topic, state)
+
+
 class BacklightTimer():
 
     def __init__(self, timeout=30, brightness=128):
@@ -80,7 +100,10 @@ class Thing():
         self.name = self.cfg.get(section, "name")
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
-
+        
+        self.mqtt.subscribe(self.topic+"/#")
+        MQTT_TOPICS.append(self.topic+"/#")
+        
         posX = int(self.cfg.get(section, "posX"))
         self.position = (posX, 50)
         self.size = (100, 100)
@@ -96,9 +119,6 @@ class Thing():
         
         return
 
-
-def on_mqtt_state(client, userdata, message):
-    userdata.set_pwr_state(str(message.payload)[2:-1])
 
 class ClockWidget(BoxLayout):
     def __init__(self, cfg, basepath, **kwargs):
@@ -147,7 +167,6 @@ class SmartPanelWidget(RelativeLayout):
         
         self.mqtt = mqtt
         self.mqtt.user_data_set(self)
-        self.mqtt.message_callback_add(MQTT_SW_TOPIC+"/POWER", on_mqtt_state)
 
         # Initialize the things
         self.things = []
@@ -156,6 +175,12 @@ class SmartPanelWidget(RelativeLayout):
             t = Thing(sec[6:], self.cfg, self.mqtt, self)
             t.init()
             self.things.append(t)
+            
+            pwr = "/POWER"
+            if t.tp == "TASMOTA WS2812":
+                pwr = "/POWER1"
+            self.mqtt.message_callback_add(t.topic+pwr, 
+                                           on_mqtt_state)
 
         self.IMGDIR="resources/nixie/"
         clock_pos = (380, 280)
@@ -195,15 +220,17 @@ class SmartPanelWidget(RelativeLayout):
         return True
 
 
-    def set_pwr_state(self, state):
+    def set_pwr_state(self, topic, state):
         with self.canvas:
             if state == "ON":
                 Color(0, 1, 0, 1, mode='rgba')
             if state == "OFF":
                 Color(1, 0, 0, 1, mode='rgba')
         
-        with self.canvas:
-            Rectangle(pos=(50,50), size=(100,100))
+        for t in self.things:
+            if mqtt.topic_matches_sub(t.topic+"/#", topic):
+                with self.canvas:
+                    Rectangle(pos=t.position, size=t.size)
     
     def repaint_canvas(self):
         with self.canvas:
@@ -256,13 +283,15 @@ if __name__ == '__main__':
     
     MQTT_HOST = config.get("MQTT", "host");
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
+    MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
     
     bl.set_power(True)
     bl.set_brightness(128)
     
     client = mqtt.Client()
+    client.on_connect = on_mqtt_connect
     client.connect(MQTT_HOST, 1883, 60)
-    client.subscribe(MQTT_SW_TOPIC+"/#")
+#    client.subscribe(MQTT_SW_TOPIC+"/#")
     client.loop_start()
     
     app = SmartPanelApp(client, config)
