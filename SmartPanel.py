@@ -95,7 +95,10 @@ class Thing():
         self.name = self.cfg.get(section, "name")
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
-
+        
+        self.mqtt.subscribe(self.topic+"/#")
+        MQTT_TOPICS.append(self.topic+"/#")
+        
         posX = int(self.cfg.get(section, "posX"))
         self.position = (posX, 50)
         self.size = (100, 100)
