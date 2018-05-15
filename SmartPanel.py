@@ -96,6 +96,14 @@ class Thing():
         
         return
 
+MQTT_TOPICS = []
+
+
+def on_mqtt_connect(client, userdata, flags, rc):
+    print("Connected with code %s" % rc)
+    for topic in MQTT_TOPICS:
+        client.subscribe(topic)
+
 
 def on_mqtt_state(client, userdata, message):
     userdata.set_pwr_state(str(message.payload)[2:-1])
@@ -256,13 +264,15 @@ if __name__ == '__main__':
     
     MQTT_HOST = config.get("MQTT", "host");
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
+    MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
     
     bl.set_power(True)
     bl.set_brightness(128)
     
     client = mqtt.Client()
+    client.on_connect = on_mqtt_connect
     client.connect(MQTT_HOST, 1883, 60)
-    client.subscribe(MQTT_SW_TOPIC+"/#")
+#    client.subscribe(MQTT_SW_TOPIC+"/#")
     client.loop_start()
     
     app = SmartPanelApp(client, config)
