@@ -227,8 +227,10 @@ class SmartPanelWidget(RelativeLayout):
             if state == "OFF":
                 Color(1, 0, 0, 1, mode='rgba')
         
-        with self.canvas:
-            Rectangle(pos=(50,50), size=(100,100))
+        for t in self.things:
+            if mqtt.topic_matches_sub(t.topic+"/#", topic):
+                with self.canvas:
+                    Rectangle(pos=t.position, size=t.size)
     
     def repaint_canvas(self):
         with self.canvas:
