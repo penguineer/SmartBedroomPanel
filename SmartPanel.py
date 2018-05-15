@@ -42,7 +42,12 @@ def on_mqtt_connect(client, userdata, flags, rc):
 
 
 def on_mqtt_state(client, userdata, message):
-    userdata.set_pwr_state(str(message.payload)[2:-1])
+    topic = message.topic
+    state = str(message.payload)[2:-1]
+    
+    print("Power {s} for {t}".format(t=topic, s=state))
+    
+    userdata.set_pwr_state(topic, state)
 
 
 class BacklightTimer():
@@ -162,7 +167,6 @@ class SmartPanelWidget(RelativeLayout):
         
         self.mqtt = mqtt
         self.mqtt.user_data_set(self)
-        self.mqtt.message_callback_add(MQTT_SW_TOPIC+"/POWER", on_mqtt_state)
 
         # Initialize the things
         self.things = []
@@ -171,6 +175,12 @@ class SmartPanelWidget(RelativeLayout):
             t = Thing(sec[6:], self.cfg, self.mqtt, self)
             t.init()
             self.things.append(t)
+            
+            pwr = "/POWER"
+            if t.tp == "TASMOTA WS2812":
+                pwr = "/POWER1"
+            self.mqtt.message_callback_add(t.topic+pwr, 
+                                           on_mqtt_state)
 
         self.IMGDIR="resources/nixie/"
         clock_pos = (380, 280)
@@ -210,7 +220,7 @@ class SmartPanelWidget(RelativeLayout):
         return True
 
 
-    def set_pwr_state(self, state):
+    def set_pwr_state(self, topic, state):
         with self.canvas:
             if state == "ON":
                 Color(0, 1, 0, 1, mode='rgba')
