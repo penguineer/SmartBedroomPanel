@@ -47,15 +47,6 @@ def on_mqtt_connect(client, userdata, flags, rc):
         client.subscribe(topic)
 
 
-def on_mqtt_state(client, userdata, message):
-    topic = message.topic
-    state = str(message.payload)[2:-1]
-    
-    print("Power {s} for {t}".format(t=topic, s=state))
-    
-    userdata.set_pwr_state(topic, state)
-
-
 class BacklightTimer():
 
     def __init__(self, timeout=30, brightness=128):
@@ -107,7 +98,7 @@ class Thing():
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
         
-        mqtt_add_topic_callback(self.mqtt, self.get_pwr_topic(), on_mqtt_state)
+        mqtt_add_topic_callback(self.mqtt, self.get_pwr_topic(), self.on_pwr_state)
         
         posX = int(self.cfg.get(section, "posX"))
         self.position = (posX, 50)
@@ -143,7 +134,22 @@ class Thing():
         if self.tp == "TASMOTA WS2812":
             sleep(1)
             self.mqtt.publish(self.topic+"/cmnd/Power3", "TOGGLE", qos=2)
+    
+    
+    def on_pwr_state(self, client, userdata, message):
+        topic = message.topic
+        state = str(message.payload)[2:-1]
         
+        print("Power {s} for {t}".format(t=topic, s=state))
+        
+        with self.widget.canvas:
+            if state == "ON":
+                Color(0, 1, 0, 1, mode='rgba')
+            if state == "OFF":
+                Color(1, 0, 0, 1, mode='rgba')
+            
+            Rectangle(pos=self.position, size=self.size)
+
 
 class ClockWidget(BoxLayout):
     def __init__(self, cfg, basepath, **kwargs):
@@ -191,7 +197,6 @@ class SmartPanelWidget(RelativeLayout):
         self.cfg = cfg
         
         self.mqtt = mqtt
-        self.mqtt.user_data_set(self)
 
         # Initialize the things
         self.things = []
@@ -226,20 +231,6 @@ class SmartPanelWidget(RelativeLayout):
                 thing.toggle()
             
         return True
-
-
-    def set_pwr_state(self, topic, state):
-        with self.canvas:
-            if state == "ON":
-                Color(0, 1, 0, 1, mode='rgba')
-            if state == "OFF":
-                Color(1, 0, 0, 1, mode='rgba')
-        
-        for t in self.things:
-            if mqtt.topic_matches_sub(t.get_pwr_topic(), topic):
-                with self.canvas:
-                    Rectangle(pos=t.position, size=t.size)
-
 
 
 class SmartPanelApp(App):
