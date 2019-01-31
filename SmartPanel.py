@@ -89,11 +89,8 @@ class Thing():
         self.cfg = cfg
         self.mqtt = mqtt
         self.widget = widget
-    
-    def init(self):
-        print("initializing thing", self.key)
-        section = "Thing:"+self.key
         
+        section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
@@ -203,7 +200,6 @@ class SmartPanelWidget(RelativeLayout):
         for sec in filter(lambda s: s.startswith("Thing:"),
                           self.cfg.sections()):
             t = Thing(sec[6:], self.cfg, self.mqtt, self)
-            t.init()
             self.things.append(t)
         
         self.IMGDIR="resources/nixie/"
