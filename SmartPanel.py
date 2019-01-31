@@ -32,6 +32,38 @@ from kivy.clock import Clock
 import paho.mqtt.client as mqtt
 
 
+class RM_COLOR:
+    def get_rgba(name):
+        # grey is fallback
+        c = (77, 77, 76, 256)
+
+        if name == "fresh" or name == "light blue":
+            c = (0, 132, 176, 256)
+
+        if name == "hope" or name == "green":
+            c = (0, 163, 86, 256)
+
+        if name == "glint" or name == "yellow":
+            c = (249, 176, 0, 256)
+
+        if name == "beat" or name == "red":
+            c = (228, 5, 41, 256)
+
+        if name == "tenacity" or name == "lilac":
+            c = (68, 53, 126, 256)
+
+        if name == "base" or name == "dark blue":
+            c = (24, 56, 107, 256)
+
+        # reboot (grey) is fallback from above
+
+        return list(map(lambda x: x/256, c))
+
+
+    def get_Color(name):
+        c = RM_COLOR.get_rgba(name)
+        return Color(c[0], c[1], c[2], c[3], mode='rgba')
+
 
 MQTT_TOPICS = []
 
@@ -99,7 +131,6 @@ class ThingState(Enum):
         
         return state
 
-
 class Thing():
     def __init__(self, key, cfg, mqtt, widget):
         self.key = key
@@ -120,9 +151,10 @@ class Thing():
         self.position = (posX, 50)
         self.size = (100, 100)
         
+        text_col = RM_COLOR.get_rgba("fresh")
         self.widget.add_widget(
             Label(pos=(self.position[0],150), text=self.name,
-                  font_size='20sp', color=(1, 1, 0, 1),
+                  font_size='20sp', color=text_col,
                   size_hint=(None, None)))
         
         self.repaint()
@@ -165,11 +197,11 @@ class Thing():
     
     
     def get_state_color(self):
-        col = Color(0.8, 0.8, 0.8, 1, mode='rgba')
+        col = RM_COLOR.get_Color("grey")
         if self.state == ThingState.ON:
-            col = Color(0, 1, 0, 1, mode='rgba')
+            col = RM_COLOR.get_Color("green")
         if self.state == ThingState.OFF:
-            col = Color(1, 0, 0, 1, mode='rgba')
+            col = RM_COLOR.get_Color("red")
         
         return col
     
