@@ -190,8 +190,6 @@ class SmartPanelWidget(RelativeLayout):
                                  size_hint=(None, None))
         self.add_widget(self.clock)
         
-        self.repaint_canvas()
-        
     
     
     def on_touch_down(self, touch):
@@ -231,13 +229,7 @@ class SmartPanelWidget(RelativeLayout):
             if mqtt.topic_matches_sub(t.topic+"/#", topic):
                 with self.canvas:
                     Rectangle(pos=t.position, size=t.size)
-    
-    def repaint_canvas(self):
-        with self.canvas:
-            Color(1, 0, 0, 1, mode='rgba')
-            Rectangle(pos=(50, 50), size=(100,100))
-            Rectangle(pos=(250, 50), size=(100,100))
-        
+
 
 
 class SmartPanelApp(App):
