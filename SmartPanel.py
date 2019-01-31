@@ -7,6 +7,7 @@
 
 import rpi_backlight as bl
 import queue
+from enum import Enum
 
 from time import sleep
 import signal
@@ -82,6 +83,22 @@ class BacklightTimer():
         
         return dimmed
 
+class ThingState(Enum):
+    UNKNOWN = 0
+    OFF = 1
+    ON = 2
+    
+    
+    def for_message(msg):
+        state = ThingState.UNKNOWN
+        
+        if msg == "ON":
+            state = ThingState.ON
+        if msg == "OFF":
+            state = ThingState.OFF
+        
+        return state
+
 
 class Thing():
     def __init__(self, key, cfg, mqtt, widget):
@@ -89,6 +106,8 @@ class Thing():
         self.cfg = cfg
         self.mqtt = mqtt
         self.widget = widget
+        
+        self.state = ThingState.UNKNOWN
         
         section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
@@ -106,9 +125,7 @@ class Thing():
                   font_size='20sp', color=(1, 1, 0, 1),
                   size_hint=(None, None)))
         
-        with self.widget.canvas:
-            Color(1, 0, 0, 1, mode='rgba')
-            Rectangle(pos=self.position, size=self.size)
+        self.repaint()
         
         return
     
@@ -126,6 +143,9 @@ class Thing():
 
 
     def toggle(self):
+        self.state = ThingState.UNKNOWN
+        self.repaint()
+        
         self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
         
         if self.tp == "TASMOTA WS2812":
@@ -136,17 +156,27 @@ class Thing():
     def on_pwr_state(self, client, userdata, message):
         topic = message.topic
         state = str(message.payload)[2:-1]
+        self.state = ThingState.for_message(state)
         
         print("Power {s} for {t}".format(t=topic, s=state))
         
+        
+        self.repaint()
+    
+    
+    def get_state_color(self):
+        col = Color(0.8, 0.8, 0.8, 1, mode='rgba')
+        if self.state == ThingState.ON:
+            col = Color(0, 1, 0, 1, mode='rgba')
+        if self.state == ThingState.OFF:
+            col = Color(1, 0, 0, 1, mode='rgba')
+        
+        return col
+    
+    
+    def repaint(self):
         with self.widget.canvas:
-            if state == "ON":
-                Color(0, 1, 0, 1, mode='rgba')
-            if state == "OFF":
-                Color(1, 0, 0, 1, mode='rgba')
-            
-            Rectangle(pos=self.position, size=self.size)
-
+            Rectangle(color=self.get_state_color(), pos=self.position, size=self.size)
 
 class ClockWidget(BoxLayout):
     def __init__(self, cfg, basepath, **kwargs):
