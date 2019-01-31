@@ -34,6 +34,12 @@ import paho.mqtt.client as mqtt
 
 MQTT_TOPICS = []
 
+def mqtt_add_topic_callback(mqtt, topic, cb):
+    mqtt.subscribe(topic)
+    MQTT_TOPICS.append(topic)
+    
+    mqtt.message_callback_add(topic, cb)
+
 
 def on_mqtt_connect(client, userdata, flags, rc):
     print("Connected with code %s" % rc)
@@ -101,8 +107,7 @@ class Thing():
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
         
-        self.mqtt.subscribe(self.topic+"/#")
-        MQTT_TOPICS.append(self.topic+"/#")
+        mqtt_add_topic_callback(self.mqtt, self.get_pwr_topic(), on_mqtt_state)
         
         posX = int(self.cfg.get(section, "posX"))
         self.position = (posX, 50)
@@ -118,7 +123,27 @@ class Thing():
             Rectangle(pos=self.position, size=self.size)
         
         return
+    
+    def get_pwr_topic(self):
+        pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
+        
+        return self.topic+pwr
 
+
+    def check_bounds(self, pos):
+        return (pos[0] > self.position[0]) and \
+               (pos[1] > self.position[1]) and \
+               (pos[0] < self.position[0] + self.size[0]) and \
+               (pos[1] < self.position[1] + self.size[1])
+
+
+    def toggle(self):
+        self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
+        
+        if self.tp == "TASMOTA WS2812":
+            sleep(1)
+            self.mqtt.publish(self.topic+"/cmnd/Power3", "TOGGLE", qos=2)
+        
 
 class ClockWidget(BoxLayout):
     def __init__(self, cfg, basepath, **kwargs):
@@ -175,21 +200,19 @@ class SmartPanelWidget(RelativeLayout):
             t = Thing(sec[6:], self.cfg, self.mqtt, self)
             t.init()
             self.things.append(t)
-            
-            pwr = "/POWER"
-            if t.tp == "TASMOTA WS2812":
-                pwr = "/POWER1"
-            self.mqtt.message_callback_add(t.topic+pwr, 
-                                           on_mqtt_state)
-
+        
         self.IMGDIR="resources/nixie/"
         clock_pos = (380, 280)
         
-        self.clock = ClockWidget(self.cfg, self.IMGDIR, 
+        self.clock = ClockWidget(self.cfg, self.IMGDIR,
                                  pos=clock_pos, size=(370, 150),
                                  size_hint=(None, None))
         self.add_widget(self.clock)
         
+    
+    
+    def filter_things_by_bounds(self, pos):
+        return filter(lambda t: t.check_bounds(pos), self.things)
     
     
     def on_touch_down(self, touch):
@@ -197,24 +220,11 @@ class SmartPanelWidget(RelativeLayout):
             pos = touch.pos
             print("Touch at ", pos)
             
-            thing = None
-            for t in self.things:
-                if ((pos[0] > t.position[0]) and
-                   (pos[1] > t.position[1]) and
-                   (pos[0] < t.position[0] + t.size[0]) and
-                   (pos[1] < t.position[1] + t.size[1])):
-                    thing = t;
-                    break;
-            
-            if not thing == None:
+            things = self.filter_things_by_bounds(pos)
+            for thing in things:
                 print("Match at thing", thing.name)
-                
-                self.mqtt.publish(thing.topic+"/cmnd/Power1", "TOGGLE", qos=2)
-                
-                if thing.tp == "TASMOTA WS2812":
-                    sleep(1)
-                    self.mqtt.publish(thing.topic+"/cmnd/Power3", "TOGGLE", qos=2)
-        
+                thing.toggle()
+            
         return True
 
 
@@ -226,7 +236,7 @@ class SmartPanelWidget(RelativeLayout):
                 Color(1, 0, 0, 1, mode='rgba')
         
         for t in self.things:
-            if mqtt.topic_matches_sub(t.topic+"/#", topic):
+            if mqtt.topic_matches_sub(t.get_pwr_topic(), topic):
                 with self.canvas:
                     Rectangle(pos=t.position, size=t.size)
 
