@@ -20,7 +20,7 @@ from threading import Timer, Thread, Event
 
 from kivy.app import App
 from kivy.uix.widget import Widget
-from kivy.graphics import Color, Rectangle
+from kivy.graphics import Color, Rectangle, Line
 from kivy.core.text import Label as CoreLabel
 from kivy.uix.label import Label
 from kivy.uix.image import Image
@@ -148,14 +148,9 @@ class Thing():
         mqtt_add_topic_callback(self.mqtt, self.get_pwr_topic(), self.on_pwr_state)
         
         posX = int(self.cfg.get(section, "posX"))
-        self.position = (posX, 50)
-        self.size = (100, 100)
-        
-        text_col = RM_COLOR.get_rgba("fresh")
-        self.widget.add_widget(
-            Label(pos=(self.position[0],150), text=self.name,
-                  font_size='20sp', color=text_col,
-                  size_hint=(None, None)))
+        posY = int(self.cfg.get(section, "posY"))
+        self.position = (posX, posY)
+        self.size = (200, 70)
         
         self.repaint()
         
@@ -192,7 +187,6 @@ class Thing():
         
         print("Power {s} for {t}".format(t=topic, s=state))
         
-        
         self.repaint()
     
     
@@ -205,10 +199,29 @@ class Thing():
         
         return col
     
+
+    def get_state_rgba(self):
+        col = RM_COLOR.get_rgba("grey")
+        if self.state == ThingState.ON:
+            col = RM_COLOR.get_rgba("green")
+        if self.state == ThingState.OFF:
+            col = RM_COLOR.get_rgba("red")
+        
+        return col
+
     
     def repaint(self):
         with self.widget.canvas:
-            Rectangle(color=self.get_state_color(), pos=self.position, size=self.size)
+            Rectangle(color=self.get_state_color(), pos=self.position, size=(40, 70))
+            
+            Line(rounded_rectangle=(self.position[0]+2, self.position[1]+2, 200, 66, 20), width=2, color=self.get_state_color())
+            
+            Label(pos=(self.position[0]+75, self.position[1]-15),
+                  text_size=(150, 30),
+                  text=self.name,
+                  font_size='24sp', valign='middle', halign='left',
+                  color=self.get_state_rgba())
+
 
 class ClockWidget(BoxLayout):
     def __init__(self, cfg, basepath, **kwargs):
