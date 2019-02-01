@@ -7,6 +7,7 @@
 
 import rpi_backlight as bl
 import queue
+from enum import Enum
 
 from time import sleep
 import signal
@@ -19,7 +20,7 @@ from threading import Timer, Thread, Event
 
 from kivy.app import App
 from kivy.uix.widget import Widget
-from kivy.graphics import Color, Rectangle
+from kivy.graphics import Color, Rectangle, Line
 from kivy.core.text import Label as CoreLabel
 from kivy.uix.label import Label
 from kivy.uix.image import Image
@@ -31,23 +32,52 @@ from kivy.clock import Clock
 import paho.mqtt.client as mqtt
 
 
+class RM_COLOR:
+    def get_rgba(name):
+        # grey is fallback
+        c = (77, 77, 76, 256)
+
+        if name == "fresh" or name == "light blue":
+            c = (0, 132, 176, 256)
+
+        if name == "hope" or name == "green":
+            c = (0, 163, 86, 256)
+
+        if name == "glint" or name == "yellow":
+            c = (249, 176, 0, 256)
+
+        if name == "beat" or name == "red":
+            c = (228, 5, 41, 256)
+
+        if name == "tenacity" or name == "lilac":
+            c = (68, 53, 126, 256)
+
+        if name == "base" or name == "dark blue":
+            c = (24, 56, 107, 256)
+
+        # reboot (grey) is fallback from above
+
+        return list(map(lambda x: x/256, c))
+
+
+    def get_Color(name):
+        c = RM_COLOR.get_rgba(name)
+        return Color(c[0], c[1], c[2], c[3], mode='rgba')
+
 
 MQTT_TOPICS = []
+
+def mqtt_add_topic_callback(mqtt, topic, cb):
+    mqtt.subscribe(topic)
+    MQTT_TOPICS.append(topic)
+    
+    mqtt.message_callback_add(topic, cb)
 
 
 def on_mqtt_connect(client, userdata, flags, rc):
     print("Connected with code %s" % rc)
     for topic in MQTT_TOPICS:
         client.subscribe(topic)
-
-
-def on_mqtt_state(client, userdata, message):
-    topic = message.topic
-    state = str(message.payload)[2:-1]
-    
-    print("Power {s} for {t}".format(t=topic, s=state))
-    
-    userdata.set_pwr_state(topic, state)
 
 
 class BacklightTimer():
@@ -85,6 +115,21 @@ class BacklightTimer():
         
         return dimmed
 
+class ThingState(Enum):
+    UNKNOWN = 0
+    OFF = 1
+    ON = 2
+    
+    
+    def for_message(msg):
+        state = ThingState.UNKNOWN
+        
+        if msg == "ON":
+            state = ThingState.ON
+        if msg == "OFF":
+            state = ThingState.OFF
+        
+        return state
 
 class Thing():
     def __init__(self, key, cfg, mqtt, widget):
@@ -92,32 +137,90 @@ class Thing():
         self.cfg = cfg
         self.mqtt = mqtt
         self.widget = widget
-    
-    def init(self):
-        print("initializing thing", self.key)
-        section = "Thing:"+self.key
         
+        self.state = ThingState.UNKNOWN
+        
+        section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
         
-        self.mqtt.subscribe(self.topic+"/#")
-        MQTT_TOPICS.append(self.topic+"/#")
+        mqtt_add_topic_callback(self.mqtt, self.get_pwr_topic(), self.on_pwr_state)
         
         posX = int(self.cfg.get(section, "posX"))
-        self.position = (posX, 50)
-        self.size = (100, 100)
+        posY = int(self.cfg.get(section, "posY"))
+        self.position = (posX, posY)
+        self.size = (200, 70)
         
-        self.widget.add_widget(
-            Label(pos=(self.position[0],150), text=self.name,
-                  font_size='20sp', color=(1, 1, 0, 1),
-                  size_hint=(None, None)))
-        
-        with self.widget.canvas:
-            Color(1, 0, 0, 1, mode='rgba')
-            Rectangle(pos=self.position, size=self.size)
+        self.repaint()
         
         return
+    
+    def get_pwr_topic(self):
+        pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
+        
+        return self.topic+pwr
+
+
+    def check_bounds(self, pos):
+        return (pos[0] > self.position[0]) and \
+               (pos[1] > self.position[1]) and \
+               (pos[0] < self.position[0] + self.size[0]) and \
+               (pos[1] < self.position[1] + self.size[1])
+
+
+    def toggle(self):
+        self.state = ThingState.UNKNOWN
+        self.repaint()
+        
+        self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
+        
+        if self.tp == "TASMOTA WS2812":
+            sleep(1)
+            self.mqtt.publish(self.topic+"/cmnd/Power3", "TOGGLE", qos=2)
+    
+    
+    def on_pwr_state(self, client, userdata, message):
+        topic = message.topic
+        state = str(message.payload)[2:-1]
+        self.state = ThingState.for_message(state)
+        
+        print("Power {s} for {t}".format(t=topic, s=state))
+        
+        self.repaint()
+    
+    
+    def get_state_color(self):
+        col = RM_COLOR.get_Color("grey")
+        if self.state == ThingState.ON:
+            col = RM_COLOR.get_Color("green")
+        if self.state == ThingState.OFF:
+            col = RM_COLOR.get_Color("red")
+        
+        return col
+    
+
+    def get_state_rgba(self):
+        col = RM_COLOR.get_rgba("grey")
+        if self.state == ThingState.ON:
+            col = RM_COLOR.get_rgba("green")
+        if self.state == ThingState.OFF:
+            col = RM_COLOR.get_rgba("red")
+        
+        return col
+
+    
+    def repaint(self):
+        with self.widget.canvas:
+            Rectangle(color=self.get_state_color(), pos=self.position, size=(40, 70))
+            
+            Line(rounded_rectangle=(self.position[0]+2, self.position[1]+2, 200, 66, 20), width=2, color=self.get_state_color())
+            
+            Label(pos=(self.position[0]+75, self.position[1]-15),
+                  text_size=(150, 30),
+                  text=self.name,
+                  font_size='24sp', valign='middle', halign='left',
+                  color=self.get_state_rgba())
 
 
 class ClockWidget(BoxLayout):
@@ -166,32 +269,26 @@ class SmartPanelWidget(RelativeLayout):
         self.cfg = cfg
         
         self.mqtt = mqtt
-        self.mqtt.user_data_set(self)
 
         # Initialize the things
         self.things = []
         for sec in filter(lambda s: s.startswith("Thing:"),
                           self.cfg.sections()):
             t = Thing(sec[6:], self.cfg, self.mqtt, self)
-            t.init()
             self.things.append(t)
-            
-            pwr = "/POWER"
-            if t.tp == "TASMOTA WS2812":
-                pwr = "/POWER1"
-            self.mqtt.message_callback_add(t.topic+pwr, 
-                                           on_mqtt_state)
-
+        
         self.IMGDIR="resources/nixie/"
         clock_pos = (380, 280)
         
-        self.clock = ClockWidget(self.cfg, self.IMGDIR, 
+        self.clock = ClockWidget(self.cfg, self.IMGDIR,
                                  pos=clock_pos, size=(370, 150),
                                  size_hint=(None, None))
         self.add_widget(self.clock)
         
-        self.repaint_canvas()
-        
+    
+    
+    def filter_things_by_bounds(self, pos):
+        return filter(lambda t: t.check_bounds(pos), self.things)
     
     
     def on_touch_down(self, touch):
@@ -199,45 +296,12 @@ class SmartPanelWidget(RelativeLayout):
             pos = touch.pos
             print("Touch at ", pos)
             
-            thing = None
-            for t in self.things:
-                if ((pos[0] > t.position[0]) and
-                   (pos[1] > t.position[1]) and
-                   (pos[0] < t.position[0] + t.size[0]) and
-                   (pos[1] < t.position[1] + t.size[1])):
-                    thing = t;
-                    break;
-            
-            if not thing == None:
+            things = self.filter_things_by_bounds(pos)
+            for thing in things:
                 print("Match at thing", thing.name)
-                
-                self.mqtt.publish(thing.topic+"/cmnd/Power1", "TOGGLE", qos=2)
-                
-                if thing.tp == "TASMOTA WS2812":
-                    sleep(1)
-                    self.mqtt.publish(thing.topic+"/cmnd/Power3", "TOGGLE", qos=2)
-        
+                thing.toggle()
+            
         return True
-
-
-    def set_pwr_state(self, topic, state):
-        with self.canvas:
-            if state == "ON":
-                Color(0, 1, 0, 1, mode='rgba')
-            if state == "OFF":
-                Color(1, 0, 0, 1, mode='rgba')
-        
-        for t in self.things:
-            if mqtt.topic_matches_sub(t.topic+"/#", topic):
-                with self.canvas:
-                    Rectangle(pos=t.position, size=t.size)
-    
-    def repaint_canvas(self):
-        with self.canvas:
-            Color(1, 0, 0, 1, mode='rgba')
-            Rectangle(pos=(50, 50), size=(100,100))
-            Rectangle(pos=(250, 50), size=(100,100))
-        
 
 
 class SmartPanelApp(App):
