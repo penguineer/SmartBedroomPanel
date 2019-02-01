@@ -242,6 +242,10 @@ class ClockWidget(BoxLayout):
                     Widget(size=(self.size[0]*0.05, 1), 
                            size_hint=(None, 1)))
         
+        with self.canvas:
+            Line(rounded_rectangle=(self.pos[0], self.pos[1], self.size[0], self.size[1], 20), width=2, color=RM_COLOR.get_Color("yellow"))
+        
+        
         Clock.schedule_interval(self.set_clock, 1)
 
 
@@ -278,7 +282,7 @@ class SmartPanelWidget(RelativeLayout):
             self.things.append(t)
         
         self.IMGDIR="resources/nixie/"
-        clock_pos = (380, 280)
+        clock_pos = (425, 325)
         
         self.clock = ClockWidget(self.cfg, self.IMGDIR,
                                  pos=clock_pos, size=(370, 150),
