@@ -282,7 +282,7 @@ class SmartPanelWidget(RelativeLayout):
             self.things.append(t)
         
         self.IMGDIR="resources/nixie/"
-        clock_pos = (380, 280)
+        clock_pos = (425, 325)
         
         self.clock = ClockWidget(self.cfg, self.IMGDIR,
                                  pos=clock_pos, size=(370, 150),
