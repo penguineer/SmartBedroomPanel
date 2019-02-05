@@ -145,7 +145,7 @@ class Thing():
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
         
-        mqtt_add_topic_callback(self.mqtt, self.get_pwr_topic(), self.on_pwr_state)
+        mqtt_add_topic_callback(self.mqtt, self.get_state_topic(), self.on_pwr_state)
         
         posX = int(self.cfg.get(section, "posX"))
         posY = int(self.cfg.get(section, "posY"))
@@ -156,9 +156,12 @@ class Thing():
         
         self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
         
+        # query the state
+        self.mqtt.publish(self.topic+"/cmnd/Power1", "?", qos=2)
+        
         return
     
-    def get_pwr_topic(self):
+    def get_state_topic(self):
         pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
         
         return self.topic+pwr
