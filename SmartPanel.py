@@ -156,6 +156,9 @@ class Thing():
         
         self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
         
+        # query the state
+        self.mqtt.publish(self.topic+"/cmnd/Power1", "?", qos=2)
+        
         return
     
     def get_state_topic(self):
