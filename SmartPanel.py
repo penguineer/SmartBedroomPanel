@@ -154,6 +154,8 @@ class Thing():
         
         self.repaint()
         
+        self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
+        
         return
     
     def get_pwr_topic(self):
@@ -173,6 +175,10 @@ class Thing():
         self.state = ThingState.UNKNOWN
         self.repaint()
         
+        self.mqtt_trigger()
+    
+    
+    def mqtt_toggle(self, *largs):
         self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
         
         if self.tp == "TASMOTA WS2812":
