@@ -5,3 +5,10 @@ topic  = <Topic Prefix>
 [Backlight]
 timeout = 30
 brightness = 128
+
+[Thing:name]
+name =
+type = TASMOTA Simple | TASMOTA WS2812
+topic =
+posX =
+posY =

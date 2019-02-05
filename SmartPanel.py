@@ -150,9 +150,11 @@ class Thing():
         posX = int(self.cfg.get(section, "posX"))
         posY = int(self.cfg.get(section, "posY"))
         self.position = (posX, posY)
-        self.size = (200, 70)
+        self.size = (300, 80)
         
         self.repaint()
+        
+        self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
         
         return
     
@@ -173,6 +175,10 @@ class Thing():
         self.state = ThingState.UNKNOWN
         self.repaint()
         
+        self.mqtt_trigger()
+    
+    
+    def mqtt_toggle(self, *largs):
         self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
         
         if self.tp == "TASMOTA WS2812":
@@ -211,15 +217,24 @@ class Thing():
 
     
     def repaint(self):
+        handle_x = int(self.size[1] * 5/7)
+        font_size = int(self.size[1]*2/5)
+        text_s_x = self.size[0] - handle_x
+        text_s_y = self.size[1]-10
+        text_x = int(handle_x/2) + int(text_s_x/2)
+        text_y = int(self.size[1]/2)-font_size+2
+        
+        
         with self.widget.canvas:
-            Rectangle(color=self.get_state_color(), pos=self.position, size=(40, 70))
+            Rectangle(color=self.get_state_color(), pos=self.position, size=(handle_x, self.size[1]))
             
-            Line(rounded_rectangle=(self.position[0]+2, self.position[1]+2, 200, 66, 20), width=2, color=self.get_state_color())
-            
-            Label(pos=(self.position[0]+75, self.position[1]-15),
-                  text_size=(150, 30),
+            Line(rounded_rectangle=(self.position[0]+2, self.position[1]+2, self.size[0], self.size[1]-4, 20), width=2, color=self.get_state_color())
+
+            Label(pos=(self.position[0]+text_x, self.position[1]-text_y),
+                  text_size=(text_s_x, text_s_y),
                   text=self.name,
-                  font_size='24sp', valign='middle', halign='left',
+                  font_size='{0}px'.format(font_size),
+                  valign='middle', halign='left',
                   color=self.get_state_rgba())
 
 
