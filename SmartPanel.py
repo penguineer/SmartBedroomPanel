@@ -5,7 +5,6 @@
 
 # Author: Stefan Haun <tux@netz39.de>
 
-import rpi_backlight as bl
 import queue
 from enum import Enum
 
@@ -355,6 +354,22 @@ def sigint_handler(signal, frame):
 
 
 def load_backlight_tmr(config):
+    import importlib.util
+
+    spec = importlib.util.find_spec('rpi_backlight')
+    if spec is None:
+        print("can't find the rpi_backlight module")
+        return None
+    else:
+        # If you chose to perform the actual import ...
+        bl = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bl)
+        # Adding the module to sys.modules is optional.
+        sys.modules['bl'] = bl
+
+    bl.set_power(True)
+    bl.set_brightness(128)
+
     timeout_s = config.get("Backlight", "timeout")
     brightness_s = config.get("Backlight", "brightness")
     back_tmr = BacklightTimer(timeout = int(timeout_s),
@@ -374,10 +389,7 @@ if __name__ == '__main__':
     MQTT_HOST = config.get("MQTT", "host");
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
     MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
-    
-    bl.set_power(True)
-    bl.set_brightness(128)
-    
+
     client = mqtt.Client()
     client.on_connect = on_mqtt_connect
     client.connect(MQTT_HOST, 1883, 60)
