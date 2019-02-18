@@ -5,7 +5,6 @@
 
 # Author: Stefan Haun <tux@netz39.de>
 
-import rpi_backlight as bl
 import queue
 from enum import Enum
 
@@ -82,15 +81,21 @@ def on_mqtt_connect(client, userdata, flags, rc):
 
 class BacklightTimer():
 
-    def __init__(self, timeout=30, brightness=128):
+    def __init__(self, bl, timeout=30, brightness=128):
+        self.bl = bl
         self.timeout = timeout
         self.brightness = brightness
-    
+
+        self.timer = None
+
+        self.bl.set_power(True)
+        self.bl.set_brightness(128)
+
     def handle_timer(self):
         print("Backlight timeout")
         
-        bl.set_brightness(11, smooth=True, duration=0.5)
-        bl.set_power(False)
+        self.bl.set_brightness(11, smooth=True, duration=0.5)
+        self.bl.set_power(False)
     
     def start(self):
         self.timer = Timer(self.timeout, self.handle_timer)
@@ -100,13 +105,13 @@ class BacklightTimer():
         self.timer.cancel()
         
     def turn_on(self):
-        bl.set_power(True)
-        bl.set_brightness(self.brightness, smooth=True, duration=0.5)
+        self.bl.set_power(True)
+        self.bl.set_brightness(self.brightness, smooth=True, duration=0.5)
         
     def reset(self):
         self.timer.cancel()
     
-        dimmed = not bl.get_power()
+        dimmed = not self.bl.get_power()
     
         if dimmed:
             self.turn_on()
@@ -114,6 +119,7 @@ class BacklightTimer():
         self.start()
         
         return dimmed
+
 
 class ThingState(Enum):
     UNKNOWN = 0
@@ -281,13 +287,11 @@ class ClockWidget(BoxLayout):
 
 
 class SmartPanelWidget(RelativeLayout):
-    def __init__(self, backlight, mqtt, cfg, **kwargs):
+    def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
-        
-        self.back_tmr = backlight
-        self.back_tmr.turn_on()
-        self.back_tmr.start()
-        
+
+        self.backlight_cb = backlight_cb
+
         self.cfg = cfg
         
         self.mqtt = mqtt
@@ -314,7 +318,7 @@ class SmartPanelWidget(RelativeLayout):
     
     
     def on_touch_down(self, touch):
-        if not self.back_tmr.reset():
+        if self.backlight_cb is not None and not self.backlight_cb():
             pos = touch.pos
             print("Touch at ", pos)
             
@@ -327,21 +331,16 @@ class SmartPanelWidget(RelativeLayout):
 
 
 class SmartPanelApp(App):
-    def __init__(self, mqtt, cfg, **kwargs):
+    def __init__(self, mqtt, cfg, backlight_cb, **kwargs):
         super(SmartPanelApp, self).__init__(**kwargs)
         
         self.mqtt = mqtt
         self.cfg = cfg
+        self.backlight_cb = backlight_cb
     
     
     def build(self):
-        timeout_s = self.cfg.get("Backlight", "timeout")
-        brightness_s = self.cfg.get("Backlight", "brightness")
-        
-        self.back_tmr = BacklightTimer(timeout = int(timeout_s), 
-                                       brightness = int(brightness_s))
-        
-        widget = SmartPanelWidget(self.back_tmr, self.mqtt, self.cfg,
+        widget = SmartPanelWidget(self.mqtt, self.cfg, backlight_cb=self.backlight_cb,
                                   pos = (0,0), size = (800, 480))
         
         return widget
@@ -361,6 +360,31 @@ def sigint_handler(signal, frame):
         sys.exit(0)
 
 
+def load_backlight_tmr(config):
+    import importlib.util
+
+    spec = importlib.util.find_spec('rpi_backlight')
+    if spec is None:
+        print("can't find the rpi_backlight module")
+        return None
+    else:
+        # If you chose to perform the actual import ...
+        bl = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bl)
+        # Adding the module to sys.modules is optional.
+        sys.modules['bl'] = bl
+
+    timeout_s = config.get("Backlight", "timeout")
+    brightness_s = config.get("Backlight", "brightness")
+    back_tmr = BacklightTimer(bl,
+                              timeout = int(timeout_s),
+                              brightness = int(brightness_s))
+    back_tmr.turn_on()
+    back_tmr.start()
+
+    return back_tmr.reset
+
+
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, sigint_handler)
     
@@ -370,17 +394,14 @@ if __name__ == '__main__':
     MQTT_HOST = config.get("MQTT", "host");
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
     MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
-    
-    bl.set_power(True)
-    bl.set_brightness(128)
-    
+
     client = mqtt.Client()
     client.on_connect = on_mqtt_connect
     client.connect(MQTT_HOST, 1883, 60)
 #    client.subscribe(MQTT_SW_TOPIC+"/#")
     client.loop_start()
-    
-    app = SmartPanelApp(client, config)
+
+    app = SmartPanelApp(client, config, backlight_cb=load_backlight_tmr(config))
     app.run()
     
     client.loop_stop()
