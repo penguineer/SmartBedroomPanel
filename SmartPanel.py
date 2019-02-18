@@ -87,7 +87,10 @@ class BacklightTimer():
         self.brightness = brightness
 
         self.timer = None
-    
+
+        self.bl.set_power(True)
+        self.bl.set_brightness(128)
+
     def handle_timer(self):
         print("Backlight timeout")
         
@@ -116,6 +119,7 @@ class BacklightTimer():
         self.start()
         
         return dimmed
+
 
 class ThingState(Enum):
     UNKNOWN = 0
@@ -369,9 +373,6 @@ def load_backlight_tmr(config):
         spec.loader.exec_module(bl)
         # Adding the module to sys.modules is optional.
         sys.modules['bl'] = bl
-
-    bl.set_power(True)
-    bl.set_brightness(128)
 
     timeout_s = config.get("Backlight", "timeout")
     brightness_s = config.get("Backlight", "brightness")
