@@ -281,13 +281,11 @@ class ClockWidget(BoxLayout):
 
 
 class SmartPanelWidget(RelativeLayout):
-    def __init__(self, backlight, mqtt, cfg, **kwargs):
+    def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
-        
-        self.back_tmr = backlight
-        self.back_tmr.turn_on()
-        self.back_tmr.start()
-        
+
+        self.backlight_cb = backlight_cb
+
         self.cfg = cfg
         
         self.mqtt = mqtt
@@ -314,7 +312,7 @@ class SmartPanelWidget(RelativeLayout):
     
     
     def on_touch_down(self, touch):
-        if not self.back_tmr.reset():
+        if self.backlight_cb is not None and not self.backlight_cb():
             pos = touch.pos
             print("Touch at ", pos)
             
@@ -327,21 +325,16 @@ class SmartPanelWidget(RelativeLayout):
 
 
 class SmartPanelApp(App):
-    def __init__(self, mqtt, cfg, **kwargs):
+    def __init__(self, mqtt, cfg, backlight_cb, **kwargs):
         super(SmartPanelApp, self).__init__(**kwargs)
         
         self.mqtt = mqtt
         self.cfg = cfg
+        self.backlight_cb = backlight_cb
     
     
     def build(self):
-        timeout_s = self.cfg.get("Backlight", "timeout")
-        brightness_s = self.cfg.get("Backlight", "brightness")
-        
-        self.back_tmr = BacklightTimer(timeout = int(timeout_s), 
-                                       brightness = int(brightness_s))
-        
-        widget = SmartPanelWidget(self.back_tmr, self.mqtt, self.cfg,
+        widget = SmartPanelWidget(self.mqtt, self.cfg, backlight_cb=self.backlight_cb,
                                   pos = (0,0), size = (800, 480))
         
         return widget
@@ -379,8 +372,15 @@ if __name__ == '__main__':
     client.connect(MQTT_HOST, 1883, 60)
 #    client.subscribe(MQTT_SW_TOPIC+"/#")
     client.loop_start()
-    
-    app = SmartPanelApp(client, config)
+
+    timeout_s = config.get("Backlight", "timeout")
+    brightness_s = config.get("Backlight", "brightness")
+    back_tmr = BacklightTimer(timeout = int(timeout_s),
+                              brightness = int(brightness_s))
+    back_tmr.turn_on()
+    back_tmr.start()
+
+    app = SmartPanelApp(client, config, backlight_cb=back_tmr.reset)
     app.run()
     
     client.loop_stop()
