@@ -81,15 +81,18 @@ def on_mqtt_connect(client, userdata, flags, rc):
 
 class BacklightTimer():
 
-    def __init__(self, timeout=30, brightness=128):
+    def __init__(self, bl, timeout=30, brightness=128):
+        self.bl = bl
         self.timeout = timeout
         self.brightness = brightness
+
+        self.timer = None
     
     def handle_timer(self):
         print("Backlight timeout")
         
-        bl.set_brightness(11, smooth=True, duration=0.5)
-        bl.set_power(False)
+        self.bl.set_brightness(11, smooth=True, duration=0.5)
+        self.bl.set_power(False)
     
     def start(self):
         self.timer = Timer(self.timeout, self.handle_timer)
@@ -99,13 +102,13 @@ class BacklightTimer():
         self.timer.cancel()
         
     def turn_on(self):
-        bl.set_power(True)
-        bl.set_brightness(self.brightness, smooth=True, duration=0.5)
+        self.bl.set_power(True)
+        self.bl.set_brightness(self.brightness, smooth=True, duration=0.5)
         
     def reset(self):
         self.timer.cancel()
     
-        dimmed = not bl.get_power()
+        dimmed = not self.bl.get_power()
     
         if dimmed:
             self.turn_on()
@@ -372,7 +375,8 @@ def load_backlight_tmr(config):
 
     timeout_s = config.get("Backlight", "timeout")
     brightness_s = config.get("Backlight", "brightness")
-    back_tmr = BacklightTimer(timeout = int(timeout_s),
+    back_tmr = BacklightTimer(bl,
+                              timeout = int(timeout_s),
                               brightness = int(brightness_s))
     back_tmr.turn_on()
     back_tmr.start()
