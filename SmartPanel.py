@@ -354,6 +354,17 @@ def sigint_handler(signal, frame):
         sys.exit(0)
 
 
+def load_backlight_tmr(config):
+    timeout_s = config.get("Backlight", "timeout")
+    brightness_s = config.get("Backlight", "brightness")
+    back_tmr = BacklightTimer(timeout = int(timeout_s),
+                              brightness = int(brightness_s))
+    back_tmr.turn_on()
+    back_tmr.start()
+
+    return back_tmr.reset
+
+
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, sigint_handler)
     
@@ -373,14 +384,7 @@ if __name__ == '__main__':
 #    client.subscribe(MQTT_SW_TOPIC+"/#")
     client.loop_start()
 
-    timeout_s = config.get("Backlight", "timeout")
-    brightness_s = config.get("Backlight", "brightness")
-    back_tmr = BacklightTimer(timeout = int(timeout_s),
-                              brightness = int(brightness_s))
-    back_tmr.turn_on()
-    back_tmr.start()
-
-    app = SmartPanelApp(client, config, backlight_cb=back_tmr.reset)
+    app = SmartPanelApp(client, config, backlight_cb=load_backlight_tmr(config))
     app.run()
     
     client.loop_stop()
