@@ -25,6 +25,8 @@ from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.boxlayout import BoxLayout
+from kivy.properties import ListProperty, StringProperty
+from kivy.lang import Builder
 
 from kivy.clock import Clock
 
@@ -138,7 +140,39 @@ class ThingState(Enum):
         return state
 
 
+Builder.load_string('''
+<Thing>:
+    font_size: self.size[1] * 2 / 5
+    handle_x: int(self.size[1] * 5 / 7)
+    text_s_x: self.size[0] - self.handle_x
+    text_s_y: self.size[1] - 10
+    text_x: int(self.handle_x / 2) + 20
+
+    canvas:
+        Color:
+            rgba: self.state_color
+        Rectangle:
+            size: (self.size[1] * 5 / 7, self.size[1])
+        Line:
+            rounded_rectangle: (2, 2, self.size[0], self.size[1] - 4, 20)
+            width: 2
+
+    Label:
+        text: root.name
+        color: root.state_color
+        pos: (root.text_x, 0)
+        text_size: (root.text_s_x, root.text_s_y)
+        font_size: root.font_size
+        halign: 'left'
+        valign: 'middle'
+        bold: True
+''')
+
+
 class Thing(RelativeLayout):
+    state_color = ListProperty(RM_COLOR.get_rgba("reboot"))
+    name = StringProperty("<None>")
+
     def __init__(self, key, cfg, mqtt, widget, pos=(0, 0), **kwargs):
         self.key = key
         self.cfg = cfg
@@ -146,7 +180,8 @@ class Thing(RelativeLayout):
         self.widget = widget
         
         self.state = ThingState.UNKNOWN
-        
+        self.state_color = self.get_state_color()
+
         section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
         self.tp = self.cfg.get(section, "type")
@@ -158,60 +193,46 @@ class Thing(RelativeLayout):
                                     size=(300, 80), size_hint=(None, None),
                                     **kwargs)
 
-        self.repaint()
-        
         self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
         
         # query the state
         self.mqtt.publish(self.topic+"/cmnd/Power1", "?", qos=2)
-        
-        return
-    
+
     def get_state_topic(self):
         pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
         
         return self.topic+pwr
 
-    def check_bounds(self, pos):
-        return self.collide_point(pos[0], pos[1])
+    def on_touch_down(self, touch):
+        if self.collide_point(touch.pos[0], touch.pos[1]):
+            self.toggle()
 
+            return True
+        else:
+            return super(Thing, self).on_touch_down(touch)
 
     def toggle(self):
         self.state = ThingState.UNKNOWN
-        self.repaint()
-        
+        self.state_color = self.get_state_color()
+
         self.mqtt_trigger()
-    
-    
+
     def mqtt_toggle(self, *largs):
         self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
         
         if self.tp == "TASMOTA WS2812":
             sleep(1)
             self.mqtt.publish(self.topic+"/cmnd/Power3", "TOGGLE", qos=2)
-    
-    
+
     def on_pwr_state(self, client, userdata, message):
         topic = message.topic
         state = str(message.payload)[2:-1]
         self.state = ThingState.for_message(state)
-        
-        print("Power {s} for {t}".format(t=topic, s=state))
-        
-        self.repaint()
-    
-    
-    def get_state_color(self):
-        col = RM_COLOR.get_Color("grey")
-        if self.state == ThingState.ON:
-            col = RM_COLOR.get_Color("green")
-        if self.state == ThingState.OFF:
-            col = RM_COLOR.get_Color("red")
-        
-        return col
-    
+        self.state_color = self.get_state_color()
 
-    def get_state_rgba(self):
+        print("Power {s} for {t}".format(t=topic, s=state))
+
+    def get_state_color(self):
         col = RM_COLOR.get_rgba("grey")
         if self.state == ThingState.ON:
             col = RM_COLOR.get_rgba("green")
@@ -219,26 +240,6 @@ class Thing(RelativeLayout):
             col = RM_COLOR.get_rgba("red")
         
         return col
-
-    def repaint(self):
-        handle_x = int(self.size[1] * 5/7)
-        font_size = int(self.size[1]*2/5)
-        text_s_x = self.size[0] - handle_x
-        text_s_y = self.size[1]-10
-        text_x = int(handle_x/2) + int(text_s_x/2)
-        text_y = int(self.size[1]/2)-font_size+2
-        
-        with self.canvas:
-            Rectangle(color=self.get_state_color(), pos=(0, 0), size=(handle_x, self.size[1]))
-            
-            Line(rounded_rectangle=(2, 2, self.size[0], self.size[1]-4, 20), width=2, color=self.get_state_color())
-
-            Label(pos=(text_x, -text_y),
-                  text_size=(text_s_x, text_s_y),
-                  text=self.name,
-                  font_size='{0}px'.format(font_size),
-                  valign='middle', halign='left',
-                  color=self.get_state_rgba())
 
 
 class ClockWidget(BoxLayout):
@@ -309,24 +310,13 @@ class SmartPanelWidget(RelativeLayout):
                                  pos=clock_pos, size=(370, 150),
                                  size_hint=(None, None))
         self.add_widget(self.clock)
-        
-    
-    
-    def filter_things_by_bounds(self, pos):
-        return filter(lambda t: t.check_bounds(pos), self.things)
-    
-    
+
     def on_touch_down(self, touch):
-        if self.backlight_cb is not None and not self.backlight_cb():
-            pos = touch.pos
-            print("Touch at ", pos)
-            
-            things = self.filter_things_by_bounds(pos)
-            for thing in things:
-                print("Match at thing", thing.name)
-                thing.toggle()
-            
-        return True
+        if self.backlight_cb is not None and self.backlight_cb():
+            # Kill event when back-light is not active
+            return True
+        else:
+            return super(SmartPanelWidget, self).on_touch_down(touch)
 
 
 class SmartPanelApp(App):
