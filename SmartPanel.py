@@ -137,8 +137,9 @@ class ThingState(Enum):
         
         return state
 
-class Thing():
-    def __init__(self, key, cfg, mqtt, widget):
+
+class Thing(RelativeLayout):
+    def __init__(self, key, cfg, mqtt, widget, pos=(0, 0), **kwargs):
         self.key = key
         self.cfg = cfg
         self.mqtt = mqtt
@@ -152,12 +153,11 @@ class Thing():
         self.topic = self.cfg.get(section, "topic")
         
         mqtt_add_topic_callback(self.mqtt, self.get_state_topic(), self.on_pwr_state)
-        
-        posX = int(self.cfg.get(section, "posX"))
-        posY = int(self.cfg.get(section, "posY"))
-        self.position = (posX, posY)
-        self.size = (300, 80)
-        
+
+        super(Thing, self).__init__(pos=pos,
+                                    size=(300, 80), size_hint=(None, None),
+                                    **kwargs)
+
         self.repaint()
         
         self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
@@ -172,12 +172,8 @@ class Thing():
         
         return self.topic+pwr
 
-
     def check_bounds(self, pos):
-        return (pos[0] > self.position[0]) and \
-               (pos[1] > self.position[1]) and \
-               (pos[0] < self.position[0] + self.size[0]) and \
-               (pos[1] < self.position[1] + self.size[1])
+        return self.collide_point(pos[0], pos[1])
 
 
     def toggle(self):
@@ -224,7 +220,6 @@ class Thing():
         
         return col
 
-    
     def repaint(self):
         handle_x = int(self.size[1] * 5/7)
         font_size = int(self.size[1]*2/5)
@@ -233,13 +228,12 @@ class Thing():
         text_x = int(handle_x/2) + int(text_s_x/2)
         text_y = int(self.size[1]/2)-font_size+2
         
-        
-        with self.widget.canvas:
-            Rectangle(color=self.get_state_color(), pos=self.position, size=(handle_x, self.size[1]))
+        with self.canvas:
+            Rectangle(color=self.get_state_color(), pos=(0, 0), size=(handle_x, self.size[1]))
             
-            Line(rounded_rectangle=(self.position[0]+2, self.position[1]+2, self.size[0], self.size[1]-4, 20), width=2, color=self.get_state_color())
+            Line(rounded_rectangle=(2, 2, self.size[0], self.size[1]-4, 20), width=2, color=self.get_state_color())
 
-            Label(pos=(self.position[0]+text_x, self.position[1]-text_y),
+            Label(pos=(text_x, -text_y),
                   text_size=(text_s_x, text_s_y),
                   text=self.name,
                   font_size='{0}px'.format(font_size),
@@ -300,8 +294,13 @@ class SmartPanelWidget(RelativeLayout):
         self.things = []
         for sec in filter(lambda s: s.startswith("Thing:"),
                           self.cfg.sections()):
-            t = Thing(sec[6:], self.cfg, self.mqtt, self)
+            section = sec[6:]
+            posX = int(self.cfg.get("Thing:"+section, "posX"))
+            posY = int(self.cfg.get("Thing:"+section, "posY"))
+
+            t = Thing(section, self.cfg, self.mqtt, self, pos=(posX, posY))
             self.things.append(t)
+            self.add_widget(t)
         
         self.IMGDIR="resources/nixie/"
         clock_pos = (425, 325)
