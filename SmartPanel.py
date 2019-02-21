@@ -432,12 +432,70 @@ Builder.load_string('''
             rgba: self.base_color
         Line:
             rounded_rectangle: (2, 2, self.size[0]-4, self.size[1]-4, 20)
-            width: 2           
+            width: 2 
+
+    # Song Artist
+    Image:
+        source: 'resources/song_artist.png'
+        size: (24, 24)
+        size_hint: (None, None)
+        pos: (10, root.size[1]-39)
+        color: root.base_color
+
+    Label:
+        text: root.song_artist
+        font_size: 20
+        size: (420, 24)
+        text_size: self.size
+        pos: (40, root.size[1]-39)
+        size_hint: (None, None)
+        color: root.base_color
+        shorten: True
+
+    # Song Album
+    Image:
+        source: 'resources/song_album.png'
+        size: (24, 24)
+        size_hint: (None, None)
+        pos: (10, root.size[1]-69)
+        color: root.base_color
+
+    Label:
+        text: root.song_album
+        font_size: 20
+        size: (420, 24)
+        text_size: self.size
+        pos: (40, root.size[1]-69)
+        size_hint: (None, None)
+        color: root.base_color
+        shorten: True
+
+    # Song Title
+    Image:
+        source: 'resources/song_title.png'
+        size: (24, 24)
+        size_hint: (None, None)
+        pos: (10, root.size[1]-99)
+        color: root.base_color
+
+    Label:
+        text: root.song_title
+        font_size: 20
+        size: (420, 24)
+        text_size: self.size
+        pos: (40, root.size[1]-99)
+        size_hint: (None, None)
+        color: root.base_color
+        shorten: True
+
 ''')
 
 
 class PlayerWidget(RelativeLayout):
     base_color = ListProperty(RM_COLOR.get_rgba("light blue"))
+    song_artist = StringProperty("<Artist>")
+    song_album = StringProperty("<Album>")
+    song_title = StringProperty("<Title>")
 
     def __init__(self, cfg, mqtt, **kwargs):
         super(PlayerWidget, self).__init__(**kwargs)
