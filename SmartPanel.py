@@ -440,7 +440,7 @@ Builder.load_string('''
         size: (24, 24)
         size_hint: (None, None)
         pos: (10, root.size[1]-39)
-        color: root.base_color
+        color: root.meta_color
 
     Label:
         text: root.song_artist
@@ -449,7 +449,7 @@ Builder.load_string('''
         text_size: self.size
         pos: (40, root.size[1]-39)
         size_hint: (None, None)
-        color: root.base_color
+        color: root.meta_color
         shorten: True
 
     # Song Album
@@ -458,7 +458,7 @@ Builder.load_string('''
         size: (24, 24)
         size_hint: (None, None)
         pos: (10, root.size[1]-69)
-        color: root.base_color
+        color: root.meta_color
 
     Label:
         text: root.song_album
@@ -467,7 +467,7 @@ Builder.load_string('''
         text_size: self.size
         pos: (40, root.size[1]-69)
         size_hint: (None, None)
-        color: root.base_color
+        color: root.meta_color
         shorten: True
 
     # Song Title
@@ -476,7 +476,7 @@ Builder.load_string('''
         size: (24, 24)
         size_hint: (None, None)
         pos: (10, root.size[1]-99)
-        color: root.base_color
+        color: root.meta_color
 
     Label:
         text: root.song_title
@@ -485,7 +485,7 @@ Builder.load_string('''
         text_size: self.size
         pos: (40, root.size[1]-99)
         size_hint: (None, None)
-        color: root.base_color
+        color: root.meta_color
         shorten: True
 
 ''')
@@ -493,6 +493,7 @@ Builder.load_string('''
 
 class PlayerWidget(RelativeLayout):
     base_color = ListProperty(RM_COLOR.get_rgba("light blue"))
+    meta_color = ListProperty(RM_COLOR.get_rgba("reboot"))
     song_artist = StringProperty("<Artist>")
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
@@ -503,6 +504,8 @@ class PlayerWidget(RelativeLayout):
         self.cfg = cfg
         self.mqtt = mqtt
 
+        self.player_state = None
+
         self.topic_base = self.cfg.get('Player', "topic")
         mqtt_add_topic_callback(self.mqtt,
                                 self.topic_base+"/song/#",
@@ -511,10 +514,12 @@ class PlayerWidget(RelativeLayout):
                                 self.topic_base+"/player/#",
                                 self.on_player_state)
 
+        self._check_player_ui_state()
+
         # query the state
         self.mqtt.publish(self.topic_base+"/CMD", "query", qos=2)
 
-    def on_song_state(self, _, _, message):
+    def on_song_state(self, _client, _userdata, message):
         topic = message.topic
         payload = message.payload.decode("utf-8")
 
@@ -527,10 +532,18 @@ class PlayerWidget(RelativeLayout):
         if mqtt.topic_matches_sub(self.topic_base+"/song/title", topic):
             self.song_title = payload
 
-    def on_player_state(self, _, _, message):
+    def on_player_state(self, _client, _userdata, message):
         topic = message.topic
-        payload = str(message.payload)
+        payload = message.payload.decode("utf-8")
 
+        if mqtt.topic_matches_sub(self.topic_base+"/player/state", topic):
+            self.player_state = payload
+
+        self._check_player_ui_state()
+
+    def _check_player_ui_state(self):
+        self.meta_color = RM_COLOR.get_rgba(
+            "light blue" if self.player_state and self.player_state == "play" else "reboot")
 
 class SmartPanelWidget(RelativeLayout):
     def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
