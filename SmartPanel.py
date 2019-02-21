@@ -242,7 +242,80 @@ class Thing(RelativeLayout):
         return col
 
 
-class ClockWidget(BoxLayout):
+Builder.load_string('''
+<ClockWidget>:
+    size: (300, 260)
+    size_hint: (None, None)
+
+    canvas:
+        Color:
+            rgba: self.base_color
+        Line:
+            rounded_rectangle: (22, 2, self.size[0]-44, self.size[1]-4, 20)
+            width: 2           
+
+        Color:
+            rgba: [0, 0, 0, 1]
+        Rectangle:
+            pos: (0, self.size[1]-122-47)
+            size: (300, 122)
+            
+        Color:
+            rgba: self.base_color
+        Line:
+            rounded_rectangle: (2, self.size[1]-112-51, 296, 110, 20)
+            width: 2           
+            
+        # Remove this later
+        Color:
+            rgba: [0, 0, 0, 1]
+        Rectangle:
+            pos: (0, 0)
+            size: (300, 94)
+
+    BoxLayout
+        pos: (5, root.size[1]-53)
+        size_hint: (None, None)
+        size: (290, 45)
+
+        Label:
+            text: root.current_date
+            color: root.base_color
+            font_size: 40
+            font_name: 'resources/FiraMono-Regular.ttf'
+
+
+    BoxLayout:
+        pos: (5, root.size[1]-158)
+        size_hint: (None, None)
+        size: (290, 100)
+               
+        Image:
+            source: root.clk_image_src_0
+            
+        Image:
+            source: root.clk_image_src_1
+        
+        Widget:
+            size: (root.size[0]*0.05, 1)
+            size_hint: (None, 1)
+            
+        Image:
+            source: root.clk_image_src_2
+            
+        Image:
+            source: root.clk_image_src_3
+''')
+
+
+class ClockWidget(RelativeLayout):
+    base_color = ListProperty(RM_COLOR.get_rgba("yellow"))
+    clk_image_src_0 = StringProperty("")
+    clk_image_src_1 = StringProperty("")
+    clk_image_src_2 = StringProperty("")
+    clk_image_src_3 = StringProperty("")
+    current_date = StringProperty("    -  -  ")
+
     def __init__(self, cfg, basepath, **kwargs):
         self.orientation = 'horizontal'
         self.spacing = self.size[0]*0.01
@@ -250,35 +323,23 @@ class ClockWidget(BoxLayout):
         self.cfg = cfg
         
         self.basepath = basepath
-        
-        self.clock_img = []
-        for i in range(0,4):
-            img = Image(source=self.basepath+"off.png")
-            self.clock_img.append(img)
-            self.add_widget(img)
-            if i == 1:
-                self.add_widget(
-                    Widget(size=(self.size[0]*0.05, 1), 
-                           size_hint=(None, 1)))
-        
-        with self.canvas:
-            Line(rounded_rectangle=(self.pos[0], self.pos[1], self.size[0], self.size[1], 20), width=2, color=RM_COLOR.get_Color("yellow"))
-        
-        
+
+        self.clk_image_src_0 = self.basepath + "off.png"
+        self.clk_image_src_1 = self.basepath + "off.png"
+        self.clk_image_src_2 = self.basepath + "off.png"
+        self.clk_image_src_3 = self.basepath + "off.png"
+
         Clock.schedule_interval(self.set_clock, 1)
 
-
-    def set_clock(self, dt):
+    def set_clock(self, _):
         datestr = str(datetime.now())
-        
-        ds = datestr[11:13] + datestr[14:16]
-        
-        for i in range(0,4):
-            src = self.basepath+ds[i]+".png"
-            
-            if not src == self.clock_img[i].source:
-                self.clock_img[i].source=src
-                self.clock_img[i].reload()
+
+        self.current_date = datestr[0:10]
+
+        self.clk_image_src_0 = "{0}{1}.png".format(self.basepath, datestr[11])
+        self.clk_image_src_1 = "{0}{1}.png".format(self.basepath, datestr[12])
+        self.clk_image_src_2 = "{0}{1}.png".format(self.basepath, datestr[14])
+        self.clk_image_src_3 = "{0}{1}.png".format(self.basepath, datestr[15])
 
 
 class SmartPanelWidget(RelativeLayout):
@@ -304,11 +365,10 @@ class SmartPanelWidget(RelativeLayout):
             self.add_widget(t)
         
         self.IMGDIR="resources/nixie/"
-        clock_pos = (2, 368)
+        clock_pos = (0, 220)
         
         self.clock = ClockWidget(self.cfg, self.IMGDIR,
-                                 pos=clock_pos, size=(298, 110),
-                                 size_hint=(None, None))
+                                 pos=clock_pos)
         self.add_widget(self.clock)
 
     def on_touch_down(self, touch):
