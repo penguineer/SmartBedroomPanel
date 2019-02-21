@@ -18,6 +18,7 @@ import configparser
 from threading import Timer, Thread, Event
 
 from kivy.app import App
+from kivy.config import Config
 from kivy.uix.widget import Widget
 from kivy.graphics import Color, Rectangle, Line
 from kivy.core.text import Label as CoreLabel
@@ -165,7 +166,7 @@ Builder.load_string('''
         font_size: root.font_size
         halign: 'left'
         valign: 'middle'
-        bold: True
+
 ''')
 
 
@@ -517,7 +518,10 @@ if __name__ == '__main__':
     
     config = configparser.ConfigParser()
     config.read("smartpanel.cfg")
-    
+
+    fonts = ['./resources/FiraSans-Regular.ttf']
+    Config.set('kivy', 'default_font', fonts)
+
     MQTT_HOST = config.get("MQTT", "host");
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
     MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
