@@ -427,27 +427,35 @@ Builder.load_string('''
     size_hint: (None, None)
 
     canvas:
-        # Upper rounded rect
+        # Border rect
         Color:
             rgba: self.base_color
         Line:
             rounded_rectangle: (2, 2, self.size[0]-4, self.size[1]-4, 20)
             width: 2 
+        
+        # Divider 
+        Color:
+            rgba: root.meta_color
+        Line:
+            points: [10, 110, 460, 110]
+            width: 1.5
+            cap: 'none'
 
     # Song Artist
     Image:
         source: 'resources/song_artist.png'
         size: (24, 24)
         size_hint: (None, None)
-        pos: (10, root.size[1]-39)
+        pos: (10, root.size[1]-36)
         color: root.meta_color
 
     Label:
         text: root.song_artist
         font_size: 20
-        size: (420, 24)
+        size: (210, 24)
         text_size: self.size
-        pos: (40, root.size[1]-39)
+        pos: (40, root.size[1]-36)
         size_hint: (None, None)
         color: root.meta_color
         shorten: True
@@ -457,15 +465,15 @@ Builder.load_string('''
         source: 'resources/song_album.png'
         size: (24, 24)
         size_hint: (None, None)
-        pos: (10, root.size[1]-69)
+        pos: (255, root.size[1]-36)
         color: root.meta_color
 
     Label:
         text: root.song_album
         font_size: 20
-        size: (420, 24)
+        size: (180, 24)
         text_size: self.size
-        pos: (40, root.size[1]-69)
+        pos: (285, root.size[1]-36)
         size_hint: (None, None)
         color: root.meta_color
         shorten: True
@@ -475,18 +483,33 @@ Builder.load_string('''
         source: 'resources/song_title.png'
         size: (24, 24)
         size_hint: (None, None)
-        pos: (10, root.size[1]-99)
+        pos: (10, root.size[1]-69)
         color: root.meta_color
 
     Label:
         text: root.song_title
         font_size: 20
-        size: (420, 24)
+        size: (415, 24)
         text_size: self.size
-        pos: (40, root.size[1]-99)
+        pos: (40, root.size[1]-69)
         size_hint: (None, None)
         color: root.meta_color
         shorten: True
+
+    # Controls
+    Image:
+        source: root.player_control_source
+        size:  (96, 96)
+        size_hint: (None, None)
+        pos: (369, 7)
+        color: root.base_color
+
+    Image:
+        source: 'resources/song_forward.png'
+        size:  (64, 64)
+        size_hint: (None, None)
+        pos: (300, 13)
+        color: root.base_color
 
 ''')
 
@@ -497,6 +520,7 @@ class PlayerWidget(RelativeLayout):
     song_artist = StringProperty("<Artist>")
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
+    player_control_source = StringProperty("")
 
     def __init__(self, cfg, mqtt, **kwargs):
         super(PlayerWidget, self).__init__(**kwargs)
@@ -504,7 +528,11 @@ class PlayerWidget(RelativeLayout):
         self.cfg = cfg
         self.mqtt = mqtt
 
-        self.player_state = None
+        self.player_state = "stop"
+        self.player_single = "0"
+        self.current_artist = "<Artist>"
+        self.current_album = "<Album>"
+        self.current_title = "<Title>"
 
         self.topic_base = self.cfg.get('Player', "topic")
         mqtt_add_topic_callback(self.mqtt,
@@ -514,7 +542,7 @@ class PlayerWidget(RelativeLayout):
                                 self.topic_base+"/player/#",
                                 self.on_player_state)
 
-        self._check_player_ui_state()
+        Clock.schedule_interval(self._player_ui_state, 0.2)
 
         # query the state
         self.mqtt.publish(self.topic_base+"/CMD", "query", qos=2)
@@ -524,13 +552,13 @@ class PlayerWidget(RelativeLayout):
         payload = message.payload.decode("utf-8")
 
         if mqtt.topic_matches_sub(self.topic_base+"/song/artist", topic):
-            self.song_artist = payload
+            self.current_artist = payload
 
         if mqtt.topic_matches_sub(self.topic_base+"/song/album", topic):
-            self.song_album = payload
+            self.current_album = payload
 
         if mqtt.topic_matches_sub(self.topic_base+"/song/title", topic):
-            self.song_title = payload
+            self.current_title = payload
 
     def on_player_state(self, _client, _userdata, message):
         topic = message.topic
@@ -539,11 +567,25 @@ class PlayerWidget(RelativeLayout):
         if mqtt.topic_matches_sub(self.topic_base+"/player/state", topic):
             self.player_state = payload
 
-        self._check_player_ui_state()
+        if mqtt.topic_matches_sub(self.topic_base+"/player/single", topic):
+            self.player_single = payload
 
-    def _check_player_ui_state(self):
+    def _player_ui_state(self, _dt):
+        self.song_artist = self.current_artist
+        self.song_album = self.current_album
+        self.song_title = self.current_title
+
         self.meta_color = RM_COLOR.get_rgba(
-            "light blue" if self.player_state and self.player_state == "play" else "reboot")
+            "light blue" if self.player_state == "play" else "reboot")
+
+        if not self.player_state == "play":
+            self.player_control_source = "resources/song_play.png"
+        else:
+            if self.player_single == "0":
+                self.player_control_source = "resources/song_stopnext.png"
+            else:
+                self.player_control_source = "resources/song_stop.png"
+
 
 class SmartPanelWidget(RelativeLayout):
     def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
