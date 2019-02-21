@@ -12,3 +12,6 @@ type = TASMOTA Simple | TASMOTA WS2812
 topic =
 posX =
 posY =
+
+[Player]
+topic =

@@ -503,7 +503,33 @@ class PlayerWidget(RelativeLayout):
         self.cfg = cfg
         self.mqtt = mqtt
 
-        pass
+        self.topic_base = self.cfg.get('Player', "topic")
+        mqtt_add_topic_callback(self.mqtt,
+                                self.topic_base+"/song/#",
+                                self.on_song_state)
+        mqtt_add_topic_callback(self.mqtt,
+                                self.topic_base+"/player/#",
+                                self.on_player_state)
+
+        # query the state
+        self.mqtt.publish(self.topic_base+"/CMD", "query", qos=2)
+
+    def on_song_state(self, _, _, message):
+        topic = message.topic
+        payload = message.payload.decode("utf-8")
+
+        if mqtt.topic_matches_sub(self.topic_base+"/song/artist", topic):
+            self.song_artist = payload
+
+        if mqtt.topic_matches_sub(self.topic_base+"/song/album", topic):
+            self.song_album = payload
+
+        if mqtt.topic_matches_sub(self.topic_base+"/song/title", topic):
+            self.song_title = payload
+
+    def on_player_state(self, _, _, message):
+        topic = message.topic
+        payload = str(message.payload)
 
 
 class SmartPanelWidget(RelativeLayout):
