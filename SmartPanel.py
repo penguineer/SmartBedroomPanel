@@ -421,6 +421,33 @@ class ClockWidget(RelativeLayout):
             return super(ClockWidget, self).on_touch_down(touch)
 
 
+Builder.load_string('''
+<PlayerWidget>:
+    size: (470, 190)
+    size_hint: (None, None)
+
+    canvas:
+        # Upper rounded rect
+        Color:
+            rgba: self.base_color
+        Line:
+            rounded_rectangle: (2, 2, self.size[0]-4, self.size[1]-4, 20)
+            width: 2           
+''')
+
+
+class PlayerWidget(RelativeLayout):
+    base_color = ListProperty(RM_COLOR.get_rgba("light blue"))
+
+    def __init__(self, cfg, mqtt, **kwargs):
+        super(PlayerWidget, self).__init__(**kwargs)
+
+        self.cfg = cfg
+        self.mqtt = mqtt
+
+        pass
+
+
 class SmartPanelWidget(RelativeLayout):
     def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
@@ -449,6 +476,10 @@ class SmartPanelWidget(RelativeLayout):
         self.clock = ClockWidget(self.cfg, self.IMGDIR,
                                  pos=clock_pos, touch_cb=None)
         self.add_widget(self.clock)
+
+        self.player = PlayerWidget(self.cfg, self.mqtt,
+                                   pos=(330, 0))
+        self.add_widget(self.player)
 
     def on_touch_down(self, touch):
         if self.backlight_cb is not None and self.backlight_cb():
