@@ -362,7 +362,7 @@ class ClockWidget(RelativeLayout):
     alarm_image_src_3 = StringProperty("")
     current_date = StringProperty("    -  -  ")
 
-    def __init__(self, cfg, basepath, **kwargs):
+    def __init__(self, cfg, basepath, touch_cb=None, **kwargs):
         self.orientation = 'horizontal'
         self.spacing = self.size[0]*0.01
         super(ClockWidget, self).__init__(**kwargs)
@@ -376,6 +376,8 @@ class ClockWidget(RelativeLayout):
         self.clk_image_src_3 = self.basepath + "off.png"
 
         self.alarm = None
+
+        self.touch_cb = touch_cb
 
         Clock.schedule_interval(self.set_clock, 1)
 
@@ -408,6 +410,15 @@ class ClockWidget(RelativeLayout):
             self.alarm_image_src_2 = "{0}{1}.png".format(self.basepath, self.alarm[3])
             self.alarm_image_src_3 = "{0}{1}.png".format(self.basepath, self.alarm[4])
 
+    def on_touch_down(self, touch):
+        if self.collide_point(touch.pos[0], touch.pos[1]):
+            if self.touch_cb:
+                self.touch_cb()
+
+            return True
+        else:
+            return super(ClockWidget, self).on_touch_down(touch)
+
 
 class SmartPanelWidget(RelativeLayout):
     def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
@@ -435,7 +446,7 @@ class SmartPanelWidget(RelativeLayout):
         clock_pos = (0, 220)
         
         self.clock = ClockWidget(self.cfg, self.IMGDIR,
-                                 pos=clock_pos)
+                                 pos=clock_pos, touch_cb=None)
         self.add_widget(self.clock)
 
     def on_touch_down(self, touch):
