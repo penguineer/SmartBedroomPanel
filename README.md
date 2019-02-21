@@ -8,3 +8,5 @@ Nixie tube images via https://nickpolyarush.deviantart.com/art/Nixie-Tube-Number
 
 Copyright:
 This resource is licensed under Creative Commons: Attribution-NonCommercial-Share Alike 4.0 International (CC BY-NC-SA 4.0).
+
+Using free icons from [pngtree.com](https://pngtree.com/free-icon).
