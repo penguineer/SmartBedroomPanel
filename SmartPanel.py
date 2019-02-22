@@ -565,6 +565,8 @@ class PlayerWidget(RelativeLayout):
         self._set_metadata('album', "<Album>")
         self._set_metadata('title', "<Title>")
 
+        self.volume_levels = [0, 61, 74, 78, 83, 87, 91, 94, 97, 100]
+
         # True if the last action has resulted in a report back
         self.state_is_reported = False
 
@@ -652,6 +654,15 @@ class PlayerWidget(RelativeLayout):
             if in_circle_bounds([332, 45], 32, tp):
                 self.on_forward_control()
 
+            # check for volume down
+            if in_circle_bounds([47, 45], 32, tp):
+                self.on_adjust_volume(up=False)
+
+            # check for volume up
+            if in_circle_bounds([232, 45], 32, tp):
+                self.on_adjust_volume(up=True)
+
+
             return True
         else:
             return super(PlayerWidget, self).on_touch_down(touch)
@@ -673,6 +684,18 @@ class PlayerWidget(RelativeLayout):
         self.mqtt.publish(self.topic_base+"/CMD", "next", qos=2)
         # call "play" so reset "single play" status
         self.mqtt.publish(self.topic_base+"/CMD", "play", qos=2)
+
+        self.state_is_reported = False
+
+    def on_adjust_volume(self, up):
+        vol = min(self.volume_levels, key=lambda x: abs(x - self._get_metadata('volume', 0)))
+        idx = self.volume_levels.index(vol)
+
+        idx += 1 if up else -1;
+        idx = max(idx, 0)
+        idx = min(idx, len(self.volume_levels)-1)
+
+        self.mqtt.publish(self.topic_base+"/CMD/volume", str(self.volume_levels[idx]), qos=2)
 
         self.state_is_reported = False
 
