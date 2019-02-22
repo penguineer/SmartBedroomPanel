@@ -441,13 +441,6 @@ Builder.load_string('''
             points: [10, 110, 460, 110]
             width: 1.5
             cap: 'none'
-        
-        # Volume slider
-        Triangle:
-            points: [20, 40, 280, 25, 280, 55]
-        Line:
-            rounded_rectangle: (self.volume_x, 20, 2, 40, 2)
-            width: 1
 
     # Song Artist
     Image:
@@ -529,7 +522,6 @@ class PlayerWidget(RelativeLayout):
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
     player_control_source = StringProperty("")
-    volume_x = NumericProperty(20)
 
     def __init__(self, cfg, mqtt, **kwargs):
         super(PlayerWidget, self).__init__(**kwargs)
@@ -615,9 +607,6 @@ class PlayerWidget(RelativeLayout):
         else:
             self.ctrl_color = RM_COLOR.get_rgba("reboot")
 
-        # Volume Slider: 20 <= x <= 280
-        self.volume_x = 20 + 2.6 * self._get_metadata('volume')
-
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
             tp = self.to_local(touch.pos[0], touch.pos[1])
@@ -633,26 +622,9 @@ class PlayerWidget(RelativeLayout):
             if in_circle_bounds([332, 45], 32, tp):
                 self.on_forward_control()
 
-            self._check_volume_touch(tp)
-
             return True
         else:
             return super(PlayerWidget, self).on_touch_down(touch)
-
-    def on_touch_move(self, touch):
-        if self.collide_point(touch.pos[0], touch.pos[1]):
-            tp = self.to_local(touch.pos[0], touch.pos[1])
-
-            self._check_volume_touch(tp)
-
-            return True
-        else:
-            return super(PlayerWidget, self).on_touch_down(touch)
-
-    def _check_volume_touch(self, tp):
-        if tp[0] in range(20, 280) and tp[1] in range(20, 60):
-            volume = int((tp[0] - 20) / 2.6)
-            self.mqtt.publish(self.topic_base + "/CMD/volume", str(volume), qos=2)
 
     def on_main_control(self):
         if not self._get_metadata('state') == "play":
