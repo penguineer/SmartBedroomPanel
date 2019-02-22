@@ -502,14 +502,14 @@ Builder.load_string('''
         size:  (96, 96)
         size_hint: (None, None)
         pos: (369, 7)
-        color: root.base_color
+        color: root.ctrl_color
 
     Image:
         source: 'resources/song_forward.png'
         size:  (64, 64)
         size_hint: (None, None)
         pos: (300, 13)
-        color: root.base_color
+        color: root.ctrl_color
 
 ''')
 
@@ -517,6 +517,7 @@ Builder.load_string('''
 class PlayerWidget(RelativeLayout):
     base_color = ListProperty(RM_COLOR.get_rgba("light blue"))
     meta_color = ListProperty(RM_COLOR.get_rgba("reboot"))
+    ctrl_color = ListProperty(RM_COLOR.get_rgba("reboot"))
     song_artist = StringProperty("<Artist>")
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
@@ -533,6 +534,9 @@ class PlayerWidget(RelativeLayout):
         self.current_artist = "<Artist>"
         self.current_album = "<Album>"
         self.current_title = "<Title>"
+
+        # True if the last action has resulted in a report back
+        self.state_is_reported = False
 
         self.topic_base = self.cfg.get('Player', "topic")
         mqtt_add_topic_callback(self.mqtt,
@@ -566,9 +570,12 @@ class PlayerWidget(RelativeLayout):
 
         if mqtt.topic_matches_sub(self.topic_base+"/player/state", topic):
             self.player_state = payload
+            self.state_is_reported = True
 
         if mqtt.topic_matches_sub(self.topic_base+"/player/single", topic):
             self.player_single = payload
+            self.state_is_reported = True
+
 
     def _player_ui_state(self, _dt):
         self.song_artist = self.current_artist
@@ -585,6 +592,50 @@ class PlayerWidget(RelativeLayout):
                 self.player_control_source = "resources/song_stopnext.png"
             else:
                 self.player_control_source = "resources/song_stop.png"
+
+        if self.state_is_reported:
+            self.ctrl_color = RM_COLOR.get_rgba("light blue")
+        else:
+            self.ctrl_color = RM_COLOR.get_rgba("reboot")
+
+    def on_touch_down(self, touch):
+        if self.collide_point(touch.pos[0], touch.pos[1]):
+            tp = self.to_local(touch.pos[0], touch.pos[1])
+
+            def in_circle_bounds(center, radius, pt):
+                return (center[0]-pt[0])**2 + (center[1]-pt[1])**2 < radius**2
+
+            # check for main control
+            if in_circle_bounds([417, 56], 48, tp):
+                self.on_main_control()
+
+            # check for forward control
+            if in_circle_bounds([332, 45], 32, tp):
+                self.on_forward_control()
+
+            return True
+        else:
+            return super(PlayerWidget, self).on_touch_down(touch)
+
+    def on_main_control(self):
+        if not self.player_state == "play":
+            cmd = "play"
+        else:
+            if self.player_single == "0":
+                cmd = "stop after"
+            else:
+                cmd = "pause"
+
+        self.mqtt.publish(self.topic_base+"/CMD", cmd, qos=2)
+
+        self.state_is_reported = False
+
+    def on_forward_control(self):
+        self.mqtt.publish(self.topic_base+"/CMD", "next", qos=2)
+        # call "play" so reset "single play" status
+        self.mqtt.publish(self.topic_base+"/CMD", "play", qos=2)
+
+        self.state_is_reported = False
 
 
 class SmartPanelWidget(RelativeLayout):
