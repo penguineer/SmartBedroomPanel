@@ -511,6 +511,33 @@ Builder.load_string('''
         pos: (300, 13)
         color: root.ctrl_color
 
+    # Volume control
+    Image:
+        source: 'resources/volume_minus.png'
+        size:  (64, 64)
+        size_hint: (None, None)
+        pos: (10, 10)
+        color: root.ctrl_color
+
+    Label:
+        text: root.volume_text
+        font_size: 36
+        size: (103, 60)
+        text_size: self.size
+        pos: (82, 10)
+        size_hint: (None, None)
+        color: root.ctrl_color
+        halign: 'center'
+        valign: 'middle'
+        bold: True
+
+    Image:
+        source: 'resources/volume_plus.png'
+        size:  (64, 64)
+        size_hint: (None, None)
+        pos: (195, 10)
+        color: root.ctrl_color
+
 ''')
 
 
@@ -522,6 +549,7 @@ class PlayerWidget(RelativeLayout):
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
     player_control_source = StringProperty("")
+    volume_text = StringProperty("100")
 
     def __init__(self, cfg, mqtt, **kwargs):
         super(PlayerWidget, self).__init__(**kwargs)
@@ -606,6 +634,8 @@ class PlayerWidget(RelativeLayout):
             self.ctrl_color = RM_COLOR.get_rgba("light blue")
         else:
             self.ctrl_color = RM_COLOR.get_rgba("reboot")
+
+        self.volume_text = str(self._get_metadata('volume', '---'))
 
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
