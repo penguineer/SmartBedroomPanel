@@ -537,12 +537,13 @@ class PlayerWidget(RelativeLayout):
         self.cfg = cfg
         self.mqtt = mqtt
 
-        self.player_state = "stop"
-        self.player_single = "0"
-        self.player_volume = 0
-        self.current_artist = "<Artist>"
-        self.current_album = "<Album>"
-        self.current_title = "<Title>"
+        self.metadata = dict()
+        self._set_metadata('state', 'stop')
+        self._set_metadata('single', '0')
+        self._set_metadata('volume', 0)
+        self._set_metadata('artist', "<Artist>")
+        self._set_metadata('album', "<Album>")
+        self._set_metadata('title', "<Title>")
 
         # True if the last action has resulted in a report back
         self.state_is_reported = False
@@ -560,47 +561,51 @@ class PlayerWidget(RelativeLayout):
         # query the state
         self.mqtt.publish(self.topic_base+"/CMD", "query", qos=2)
 
+    def _set_metadata(self, key, value):
+        self.metadata[key] = value
+        self.state_is_reported = True
+
+    def _get_metadata(self, key, default=None):
+        return self.metadata[key] if key in self.metadata.keys() else default
+
     def on_song_state(self, _client, _userdata, message):
         topic = message.topic
         payload = message.payload.decode("utf-8")
 
         if mqtt.topic_matches_sub(self.topic_base+"/song/artist", topic):
-            self.current_artist = payload
+            self._set_metadata('artist', payload)
 
         if mqtt.topic_matches_sub(self.topic_base+"/song/album", topic):
-            self.current_album = payload
+            self._set_metadata('album', payload)
 
         if mqtt.topic_matches_sub(self.topic_base+"/song/title", topic):
-            self.current_title = payload
+            self._set_metadata('title', payload)
 
     def on_player_state(self, _client, _userdata, message):
         topic = message.topic
         payload = message.payload.decode("utf-8")
 
         if mqtt.topic_matches_sub(self.topic_base+"/player/state", topic):
-            self.player_state = payload
-            self.state_is_reported = True
+            self._set_metadata('state', payload)
 
         if mqtt.topic_matches_sub(self.topic_base+"/player/single", topic):
-            self.player_single = payload
-            self.state_is_reported = True
+            self._set_metadata('single', payload)
 
         if mqtt.topic_matches_sub(self.topic_base+"/player/volume", topic):
-            self.player_volume = int(payload)
-
+            self._set_metadata('volume', int(payload))
 
     def _player_ui_state(self, _dt):
-        self.song_artist = self.current_artist
-        self.song_album = self.current_album
-        self.song_title = self.current_title
+        self.song_artist = self._get_metadata('artist')
+        self.song_album = self._get_metadata('album')
+        self.song_title = self._get_metadata('title')
 
         self.meta_color = RM_COLOR.get_rgba(
-            "light blue" if self.player_state == "play" else "reboot")
+            "light blue" if self._get_metadata('state') == "play" else "reboot")
 
-        if not self.player_state == "play":
+        if not self._get_metadata('state') == "play":
             self.player_control_source = "resources/song_play.png"
         else:
-            if self.player_single == "0":
+            if self._get_metadata('single') == "0":
                 self.player_control_source = "resources/song_stopnext.png"
             else:
                 self.player_control_source = "resources/song_stop.png"
@@ -611,7 +616,7 @@ class PlayerWidget(RelativeLayout):
             self.ctrl_color = RM_COLOR.get_rgba("reboot")
 
         # Volume Slider: 20 <= x <= 280
-        self.volume_x = 20 + 2.6 * self.player_volume
+        self.volume_x = 20 + 2.6 * self._get_metadata('volume')
 
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
@@ -650,10 +655,10 @@ class PlayerWidget(RelativeLayout):
             self.mqtt.publish(self.topic_base + "/CMD/volume", str(volume), qos=2)
 
     def on_main_control(self):
-        if not self.player_state == "play":
+        if not self._get_metadata('state') == "play":
             cmd = "play"
         else:
-            if self.player_single == "0":
+            if self._get_metadata('single') == "0":
                 cmd = "stop after"
             else:
                 cmd = "pause"
