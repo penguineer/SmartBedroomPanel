@@ -441,13 +441,6 @@ Builder.load_string('''
             points: [10, 110, 460, 110]
             width: 1.5
             cap: 'none'
-        
-        # Volume slider
-        Triangle:
-            points: [20, 40, 280, 25, 280, 55]
-        Line:
-            rounded_rectangle: (self.volume_x, 20, 2, 40, 2)
-            width: 1
 
     # Song Artist
     Image:
@@ -518,6 +511,33 @@ Builder.load_string('''
         pos: (300, 13)
         color: root.ctrl_color
 
+    # Volume control
+    Image:
+        source: 'resources/volume_minus.png'
+        size:  (64, 64)
+        size_hint: (None, None)
+        pos: (10, 10)
+        color: root.ctrl_color
+
+    Label:
+        text: root.volume_text
+        font_size: 36
+        size: (103, 60)
+        text_size: self.size
+        pos: (82, 10)
+        size_hint: (None, None)
+        color: root.ctrl_color
+        halign: 'center'
+        valign: 'middle'
+        bold: True
+
+    Image:
+        source: 'resources/volume_plus.png'
+        size:  (64, 64)
+        size_hint: (None, None)
+        pos: (195, 10)
+        color: root.ctrl_color
+
 ''')
 
 
@@ -529,7 +549,7 @@ class PlayerWidget(RelativeLayout):
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
     player_control_source = StringProperty("")
-    volume_x = NumericProperty(20)
+    volume_text = StringProperty("100")
 
     def __init__(self, cfg, mqtt, **kwargs):
         super(PlayerWidget, self).__init__(**kwargs)
@@ -544,6 +564,8 @@ class PlayerWidget(RelativeLayout):
         self._set_metadata('artist', "<Artist>")
         self._set_metadata('album', "<Album>")
         self._set_metadata('title', "<Title>")
+
+        self.volume_levels = [0, 61, 74, 78, 83, 87, 91, 94, 97, 100]
 
         # True if the last action has resulted in a report back
         self.state_is_reported = False
@@ -615,8 +637,7 @@ class PlayerWidget(RelativeLayout):
         else:
             self.ctrl_color = RM_COLOR.get_rgba("reboot")
 
-        # Volume Slider: 20 <= x <= 280
-        self.volume_x = 20 + 2.6 * self._get_metadata('volume')
+        self.volume_text = str(self._get_metadata('volume', '---'))
 
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
@@ -633,26 +654,18 @@ class PlayerWidget(RelativeLayout):
             if in_circle_bounds([332, 45], 32, tp):
                 self.on_forward_control()
 
-            self._check_volume_touch(tp)
+            # check for volume down
+            if in_circle_bounds([47, 45], 32, tp):
+                self.on_adjust_volume(up=False)
+
+            # check for volume up
+            if in_circle_bounds([232, 45], 32, tp):
+                self.on_adjust_volume(up=True)
+
 
             return True
         else:
             return super(PlayerWidget, self).on_touch_down(touch)
-
-    def on_touch_move(self, touch):
-        if self.collide_point(touch.pos[0], touch.pos[1]):
-            tp = self.to_local(touch.pos[0], touch.pos[1])
-
-            self._check_volume_touch(tp)
-
-            return True
-        else:
-            return super(PlayerWidget, self).on_touch_down(touch)
-
-    def _check_volume_touch(self, tp):
-        if tp[0] in range(20, 280) and tp[1] in range(20, 60):
-            volume = int((tp[0] - 20) / 2.6)
-            self.mqtt.publish(self.topic_base + "/CMD/volume", str(volume), qos=2)
 
     def on_main_control(self):
         if not self._get_metadata('state') == "play":
@@ -671,6 +684,18 @@ class PlayerWidget(RelativeLayout):
         self.mqtt.publish(self.topic_base+"/CMD", "next", qos=2)
         # call "play" so reset "single play" status
         self.mqtt.publish(self.topic_base+"/CMD", "play", qos=2)
+
+        self.state_is_reported = False
+
+    def on_adjust_volume(self, up):
+        vol = min(self.volume_levels, key=lambda x: abs(x - self._get_metadata('volume', 0)))
+        idx = self.volume_levels.index(vol)
+
+        idx += 1 if up else -1;
+        idx = max(idx, 0)
+        idx = min(idx, len(self.volume_levels)-1)
+
+        self.mqtt.publish(self.topic_base+"/CMD/volume", str(self.volume_levels[idx]), qos=2)
 
         self.state_is_reported = False
 
