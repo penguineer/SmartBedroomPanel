@@ -421,6 +421,255 @@ class ClockWidget(RelativeLayout):
             return super(ClockWidget, self).on_touch_down(touch)
 
 
+Builder.load_string('''
+<PlayerWidget>:
+    size: (470, 190)
+    size_hint: (None, None)
+
+    canvas:
+        # Border rect
+        Color:
+            rgba: self.base_color
+        Line:
+            rounded_rectangle: (2, 2, self.size[0]-4, self.size[1]-4, 20)
+            width: 2 
+        
+        # Divider 
+        Color:
+            rgba: root.meta_color
+        Line:
+            points: [10, 110, 460, 110]
+            width: 1.5
+            cap: 'none'
+        
+        # Volume slider
+        Triangle:
+            points: [20, 40, 280, 25, 280, 55]
+        Line:
+            rounded_rectangle: (self.volume_x, 20, 2, 40, 2)
+            width: 1
+
+    # Song Artist
+    Image:
+        source: 'resources/song_artist.png'
+        size: (24, 24)
+        size_hint: (None, None)
+        pos: (10, root.size[1]-36)
+        color: root.meta_color
+
+    Label:
+        text: root.song_artist
+        font_size: 20
+        size: (210, 24)
+        text_size: self.size
+        pos: (40, root.size[1]-36)
+        size_hint: (None, None)
+        color: root.meta_color
+        shorten: True
+
+    # Song Album
+    Image:
+        source: 'resources/song_album.png'
+        size: (24, 24)
+        size_hint: (None, None)
+        pos: (255, root.size[1]-36)
+        color: root.meta_color
+
+    Label:
+        text: root.song_album
+        font_size: 20
+        size: (180, 24)
+        text_size: self.size
+        pos: (285, root.size[1]-36)
+        size_hint: (None, None)
+        color: root.meta_color
+        shorten: True
+
+    # Song Title
+    Image:
+        source: 'resources/song_title.png'
+        size: (24, 24)
+        size_hint: (None, None)
+        pos: (10, root.size[1]-69)
+        color: root.meta_color
+
+    Label:
+        text: root.song_title
+        font_size: 20
+        size: (415, 24)
+        text_size: self.size
+        pos: (40, root.size[1]-69)
+        size_hint: (None, None)
+        color: root.meta_color
+        shorten: True
+
+    # Controls
+    Image:
+        source: root.player_control_source
+        size:  (96, 96)
+        size_hint: (None, None)
+        pos: (369, 7)
+        color: root.ctrl_color
+
+    Image:
+        source: 'resources/song_forward.png'
+        size:  (64, 64)
+        size_hint: (None, None)
+        pos: (300, 13)
+        color: root.ctrl_color
+
+''')
+
+
+class PlayerWidget(RelativeLayout):
+    base_color = ListProperty(RM_COLOR.get_rgba("light blue"))
+    meta_color = ListProperty(RM_COLOR.get_rgba("reboot"))
+    ctrl_color = ListProperty(RM_COLOR.get_rgba("reboot"))
+    song_artist = StringProperty("<Artist>")
+    song_album = StringProperty("<Album>")
+    song_title = StringProperty("<Title>")
+    player_control_source = StringProperty("")
+    volume_x = NumericProperty(20)
+
+    def __init__(self, cfg, mqtt, **kwargs):
+        super(PlayerWidget, self).__init__(**kwargs)
+
+        self.cfg = cfg
+        self.mqtt = mqtt
+
+        self.player_state = "stop"
+        self.player_single = "0"
+        self.player_volume = 0
+        self.current_artist = "<Artist>"
+        self.current_album = "<Album>"
+        self.current_title = "<Title>"
+
+        # True if the last action has resulted in a report back
+        self.state_is_reported = False
+
+        self.topic_base = self.cfg.get('Player', "topic")
+        mqtt_add_topic_callback(self.mqtt,
+                                self.topic_base+"/song/#",
+                                self.on_song_state)
+        mqtt_add_topic_callback(self.mqtt,
+                                self.topic_base+"/player/#",
+                                self.on_player_state)
+
+        Clock.schedule_interval(self._player_ui_state, 0.2)
+
+        # query the state
+        self.mqtt.publish(self.topic_base+"/CMD", "query", qos=2)
+
+    def on_song_state(self, _client, _userdata, message):
+        topic = message.topic
+        payload = message.payload.decode("utf-8")
+
+        if mqtt.topic_matches_sub(self.topic_base+"/song/artist", topic):
+            self.current_artist = payload
+
+        if mqtt.topic_matches_sub(self.topic_base+"/song/album", topic):
+            self.current_album = payload
+
+        if mqtt.topic_matches_sub(self.topic_base+"/song/title", topic):
+            self.current_title = payload
+
+    def on_player_state(self, _client, _userdata, message):
+        topic = message.topic
+        payload = message.payload.decode("utf-8")
+
+        if mqtt.topic_matches_sub(self.topic_base+"/player/state", topic):
+            self.player_state = payload
+            self.state_is_reported = True
+
+        if mqtt.topic_matches_sub(self.topic_base+"/player/single", topic):
+            self.player_single = payload
+            self.state_is_reported = True
+
+        if mqtt.topic_matches_sub(self.topic_base+"/player/volume", topic):
+            self.player_volume = int(payload)
+
+
+    def _player_ui_state(self, _dt):
+        self.song_artist = self.current_artist
+        self.song_album = self.current_album
+        self.song_title = self.current_title
+
+        self.meta_color = RM_COLOR.get_rgba(
+            "light blue" if self.player_state == "play" else "reboot")
+
+        if not self.player_state == "play":
+            self.player_control_source = "resources/song_play.png"
+        else:
+            if self.player_single == "0":
+                self.player_control_source = "resources/song_stopnext.png"
+            else:
+                self.player_control_source = "resources/song_stop.png"
+
+        if self.state_is_reported:
+            self.ctrl_color = RM_COLOR.get_rgba("light blue")
+        else:
+            self.ctrl_color = RM_COLOR.get_rgba("reboot")
+
+        # Volume Slider: 20 <= x <= 280
+        self.volume_x = 20 + 2.6 * self.player_volume
+
+    def on_touch_down(self, touch):
+        if self.collide_point(touch.pos[0], touch.pos[1]):
+            tp = self.to_local(touch.pos[0], touch.pos[1])
+
+            def in_circle_bounds(center, radius, pt):
+                return (center[0]-pt[0])**2 + (center[1]-pt[1])**2 < radius**2
+
+            # check for main control
+            if in_circle_bounds([417, 56], 48, tp):
+                self.on_main_control()
+
+            # check for forward control
+            if in_circle_bounds([332, 45], 32, tp):
+                self.on_forward_control()
+
+            self._check_volume_touch(tp)
+
+            return True
+        else:
+            return super(PlayerWidget, self).on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        if self.collide_point(touch.pos[0], touch.pos[1]):
+            tp = self.to_local(touch.pos[0], touch.pos[1])
+
+            self._check_volume_touch(tp)
+
+            return True
+        else:
+            return super(PlayerWidget, self).on_touch_down(touch)
+
+    def _check_volume_touch(self, tp):
+        if tp[0] in range(20, 280) and tp[1] in range(20, 60):
+            volume = int((tp[0] - 20) / 2.6)
+            self.mqtt.publish(self.topic_base + "/CMD/volume", str(volume), qos=2)
+
+    def on_main_control(self):
+        if not self.player_state == "play":
+            cmd = "play"
+        else:
+            if self.player_single == "0":
+                cmd = "stop after"
+            else:
+                cmd = "pause"
+
+        self.mqtt.publish(self.topic_base+"/CMD", cmd, qos=2)
+
+        self.state_is_reported = False
+
+    def on_forward_control(self):
+        self.mqtt.publish(self.topic_base+"/CMD", "next", qos=2)
+        # call "play" so reset "single play" status
+        self.mqtt.publish(self.topic_base+"/CMD", "play", qos=2)
+
+        self.state_is_reported = False
+
+
 class SmartPanelWidget(RelativeLayout):
     def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
@@ -449,6 +698,10 @@ class SmartPanelWidget(RelativeLayout):
         self.clock = ClockWidget(self.cfg, self.IMGDIR,
                                  pos=clock_pos, touch_cb=None)
         self.add_widget(self.clock)
+
+        self.player = PlayerWidget(self.cfg, self.mqtt,
+                                   pos=(330, 0))
+        self.add_widget(self.player)
 
     def on_touch_down(self, touch):
         if self.backlight_cb is not None and self.backlight_cb():
