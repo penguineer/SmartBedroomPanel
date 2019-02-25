@@ -1,6 +1,7 @@
 # SmartBedroomPanel
 RPi+Touchscreen based panel for Smart Home in the bedroom
 
+![Screenshot 2019-02-22](Screenshot_2019-02-22.jpg)
 
 ## Contributed Resources
 
