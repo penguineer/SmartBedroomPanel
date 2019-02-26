@@ -805,6 +805,10 @@ if __name__ == '__main__':
     fonts = ['./resources/FiraSans-Regular.ttf']
     Config.set('kivy', 'default_font', fonts)
 
+    if not "MQTT" in config.keys():
+        print("Missing MQTT section in configuration. See template for an example.")
+        sys.exit(1)
+    
     MQTT_HOST = config.get("MQTT", "host");
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
     MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
