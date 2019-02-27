@@ -802,8 +802,13 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read("smartpanel.cfg")
 
-    fonts = ['./resources/FiraSans-Regular.ttf']
-    Config.set('kivy', 'default_font', fonts)
+    Config.set('kivy', 'default_font', [
+        ' FiraSans-Regular',
+        './resources/FiraSans-Regular.ttf',
+        './resources/FiraSans-Regular.ttf',
+        './resources/FiraSans-Regular.ttf',
+        './resources/FiraSans-Regular.ttf'
+    ])
 
     if "MQTT" not in config.keys():
         print("Missing MQTT section in configuration. See template for an example.")
