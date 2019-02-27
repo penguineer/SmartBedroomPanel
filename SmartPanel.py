@@ -4,8 +4,7 @@
 # with Raspberry Pi and RPi Touch Screen
 
 # Author: Stefan Haun <tux@netz39.de>
-
-import queue
+from builtins import staticmethod
 from enum import Enum
 
 from time import sleep
@@ -15,17 +14,12 @@ from datetime import datetime
 
 import configparser
 
-from threading import Timer, Thread, Event
+from threading import Timer
 
 from kivy.app import App
 from kivy.config import Config
-from kivy.uix.widget import Widget
-from kivy.graphics import Color, Rectangle, Line
-from kivy.core.text import Label as CoreLabel
-from kivy.uix.label import Label
-from kivy.uix.image import Image
+from kivy.graphics import Color
 from kivy.uix.relativelayout import RelativeLayout
-from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import ListProperty, StringProperty, NumericProperty
 from kivy.lang import Builder
 
@@ -34,7 +28,8 @@ from kivy.clock import Clock
 import paho.mqtt.client as mqtt
 
 
-class RM_COLOR:
+class RMColor:
+    @staticmethod
     def get_rgba(name):
         # grey is fallback
         c = (77, 77, 76, 256)
@@ -61,29 +56,29 @@ class RM_COLOR:
 
         return list(map(lambda x: x/256, c))
 
-
-    def get_Color(name):
-        c = RM_COLOR.get_rgba(name)
+    @staticmethod
+    def get_color(name):
+        c = RMColor.get_rgba(name)
         return Color(c[0], c[1], c[2], c[3], mode='rgba')
 
 
 MQTT_TOPICS = []
 
-def mqtt_add_topic_callback(mqtt, topic, cb):
-    mqtt.subscribe(topic)
+
+def mqtt_add_topic_callback(mqttc, topic, cb):
+    mqttc.subscribe(topic)
     MQTT_TOPICS.append(topic)
     
-    mqtt.message_callback_add(topic, cb)
+    mqttc.message_callback_add(topic, cb)
 
 
-def on_mqtt_connect(client, userdata, flags, rc):
+def on_mqtt_connect(mqttc, _userdata, _flags, rc):
     print("Connected with code %s" % rc)
     for topic in MQTT_TOPICS:
-        client.subscribe(topic)
+        mqttc.subscribe(topic)
 
 
-class BacklightTimer():
-
+class BacklightTimer:
     def __init__(self, bl, timeout=30, brightness=128):
         self.bl = bl
         self.timeout = timeout
@@ -128,8 +123,8 @@ class ThingState(Enum):
     UNKNOWN = 0
     OFF = 1
     ON = 2
-    
-    
+
+    @staticmethod
     def for_message(msg):
         state = ThingState.UNKNOWN
         
@@ -171,13 +166,13 @@ Builder.load_string('''
 
 
 class Thing(RelativeLayout):
-    state_color = ListProperty(RM_COLOR.get_rgba("reboot"))
+    state_color = ListProperty()
     name = StringProperty("<None>")
 
-    def __init__(self, key, cfg, mqtt, widget, pos=(0, 0), **kwargs):
+    def __init__(self, key, cfg, mqttc, widget, pos=(0, 0), **kwargs):
         self.key = key
         self.cfg = cfg
-        self.mqtt = mqtt
+        self.mqtt = mqttc
         self.widget = widget
         
         self.state = ThingState.UNKNOWN
@@ -218,14 +213,14 @@ class Thing(RelativeLayout):
 
         self.mqtt_trigger()
 
-    def mqtt_toggle(self, *largs):
+    def mqtt_toggle(self, *_largs):
         self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
         
         if self.tp == "TASMOTA WS2812":
             sleep(1)
             self.mqtt.publish(self.topic+"/cmnd/Power3", "TOGGLE", qos=2)
 
-    def on_pwr_state(self, client, userdata, message):
+    def on_pwr_state(self, _client, _userdata, message):
         topic = message.topic
         state = str(message.payload)[2:-1]
         self.state = ThingState.for_message(state)
@@ -234,11 +229,11 @@ class Thing(RelativeLayout):
         print("Power {s} for {t}".format(t=topic, s=state))
 
     def get_state_color(self):
-        col = RM_COLOR.get_rgba("grey")
+        col = RMColor.get_rgba("grey")
         if self.state == ThingState.ON:
-            col = RM_COLOR.get_rgba("green")
+            col = RMColor.get_rgba("green")
         if self.state == ThingState.OFF:
-            col = RM_COLOR.get_rgba("red")
+            col = RMColor.get_rgba("red")
         
         return col
 
@@ -350,12 +345,12 @@ Builder.load_string('''
 
 
 class ClockWidget(RelativeLayout):
-    base_color = ListProperty(RM_COLOR.get_rgba("yellow"))
+    base_color = ListProperty()
     clk_image_src_0 = StringProperty("")
     clk_image_src_1 = StringProperty("")
     clk_image_src_2 = StringProperty("")
     clk_image_src_3 = StringProperty("")
-    alarm_color = ListProperty(RM_COLOR.get_rgba("reboot"))
+    alarm_color = ListProperty()
     alarm_digit_alpha = NumericProperty(0)
     alarm_image_src_0 = StringProperty("")
     alarm_image_src_1 = StringProperty("")
@@ -364,6 +359,9 @@ class ClockWidget(RelativeLayout):
     current_date = StringProperty("    -  -  ")
 
     def __init__(self, cfg, basepath, touch_cb=None, **kwargs):
+        self.base_color = RMColor.get_rgba("yellow")
+        self.alarm_color = RMColor.get_rgba("reboot")
+
         self.orientation = 'horizontal'
         self.spacing = self.size[0]*0.01
         super(ClockWidget, self).__init__(**kwargs)
@@ -398,14 +396,14 @@ class ClockWidget(RelativeLayout):
 
         if not self.alarm:
             self.alarm_digit_alpha = 1
-            self.alarm_color = RM_COLOR.get_rgba("reboot")
+            self.alarm_color = RMColor.get_rgba("reboot")
             self.alarm_image_src_0 = self.basepath + "off.png"
             self.alarm_image_src_1 = self.basepath + "off.png"
             self.alarm_image_src_2 = self.basepath + "off.png"
             self.alarm_image_src_3 = self.basepath + "off.png"
         else:
             self.alarm_digit_alpha = 1
-            self.alarm_color = RM_COLOR.get_rgba("yellow")
+            self.alarm_color = RMColor.get_rgba("yellow")
             self.alarm_image_src_0 = "{0}{1}.png".format(self.basepath, self.alarm[0])
             self.alarm_image_src_1 = "{0}{1}.png".format(self.basepath, self.alarm[1])
             self.alarm_image_src_2 = "{0}{1}.png".format(self.basepath, self.alarm[3])
@@ -542,20 +540,24 @@ Builder.load_string('''
 
 
 class PlayerWidget(RelativeLayout):
-    base_color = ListProperty(RM_COLOR.get_rgba("light blue"))
-    meta_color = ListProperty(RM_COLOR.get_rgba("reboot"))
-    ctrl_color = ListProperty(RM_COLOR.get_rgba("reboot"))
+    base_color = ListProperty()
+    meta_color = ListProperty()
+    ctrl_color = ListProperty()
     song_artist = StringProperty("<Artist>")
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
     player_control_source = StringProperty("")
     volume_text = StringProperty("100")
 
-    def __init__(self, cfg, mqtt, **kwargs):
+    def __init__(self, cfg, mqttc, **kwargs):
+        self.base_color = RMColor.get_rgba("light blue")
+        self.meta_color = RMColor.get_rgba("reboot")
+        self.ctrl_color = RMColor.get_rgba("reboot")
+
         super(PlayerWidget, self).__init__(**kwargs)
 
         self.cfg = cfg
-        self.mqtt = mqtt
+        self.mqtt = mqttc
 
         self.metadata = dict()
         self._set_metadata('state', 'stop')
@@ -621,7 +623,7 @@ class PlayerWidget(RelativeLayout):
         self.song_album = self._get_metadata('album')
         self.song_title = self._get_metadata('title')
 
-        self.meta_color = RM_COLOR.get_rgba(
+        self.meta_color = RMColor.get_rgba(
             "light blue" if self._get_metadata('state') == "play" else "reboot")
 
         if not self._get_metadata('state') == "play":
@@ -633,9 +635,9 @@ class PlayerWidget(RelativeLayout):
                 self.player_control_source = "resources/song_stop.png"
 
         if self.state_is_reported:
-            self.ctrl_color = RM_COLOR.get_rgba("light blue")
+            self.ctrl_color = RMColor.get_rgba("light blue")
         else:
-            self.ctrl_color = RM_COLOR.get_rgba("reboot")
+            self.ctrl_color = RMColor.get_rgba("reboot")
 
         self.volume_text = str(self._get_metadata('volume', '---'))
 
@@ -661,7 +663,6 @@ class PlayerWidget(RelativeLayout):
             # check for volume up
             if in_circle_bounds([232, 45], 32, tp):
                 self.on_adjust_volume(up=True)
-
 
             return True
         else:
@@ -691,7 +692,7 @@ class PlayerWidget(RelativeLayout):
         vol = min(self.volume_levels, key=lambda x: abs(x - self._get_metadata('volume', 0)))
         idx = self.volume_levels.index(vol)
 
-        idx += 1 if up else -1;
+        idx += 1 if up else -1
         idx = max(idx, 0)
         idx = min(idx, len(self.volume_levels)-1)
 
@@ -701,28 +702,28 @@ class PlayerWidget(RelativeLayout):
 
 
 class SmartPanelWidget(RelativeLayout):
-    def __init__(self, mqtt, cfg, backlight_cb=None, **kwargs):
+    def __init__(self, mqttc, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
 
         self.backlight_cb = backlight_cb
 
         self.cfg = cfg
         
-        self.mqtt = mqtt
+        self.mqtt = mqttc
 
         # Initialize the things
         self.things = []
         for sec in filter(lambda s: s.startswith("Thing:"),
                           self.cfg.sections()):
             section = sec[6:]
-            posX = int(self.cfg.get("Thing:"+section, "posX"))
-            posY = int(self.cfg.get("Thing:"+section, "posY"))
+            pos_x = int(self.cfg.get("Thing:"+section, "posX"))
+            pos_y = int(self.cfg.get("Thing:"+section, "posY"))
 
-            t = Thing(section, self.cfg, self.mqtt, self, pos=(posX, posY))
+            t = Thing(section, self.cfg, self.mqtt, self, pos=(pos_x, pos_y))
             self.things.append(t)
             self.add_widget(t)
         
-        self.IMGDIR="resources/nixie/"
+        self.IMGDIR = "resources/nixie/"
         clock_pos = (0, 220)
         
         self.clock = ClockWidget(self.cfg, self.IMGDIR,
@@ -742,36 +743,35 @@ class SmartPanelWidget(RelativeLayout):
 
 
 class SmartPanelApp(App):
-    def __init__(self, mqtt, cfg, backlight_cb, **kwargs):
+    def __init__(self, mqttc, cfg, backlight_cb, **kwargs):
         super(SmartPanelApp, self).__init__(**kwargs)
         
-        self.mqtt = mqtt
+        self.mqtt = mqttc
         self.cfg = cfg
         self.backlight_cb = backlight_cb
-    
-    
+
     def build(self):
         widget = SmartPanelWidget(self.mqtt, self.cfg, backlight_cb=self.backlight_cb,
-                                  pos = (0,0), size = (800, 480))
+                                  size=(800, 480))
         
         return widget
 
 
-global running
 running = True
 
-def sigint_handler(signal, frame):
+
+def sigint_handler(_signal, _frame):
     global running
     
     if running:
         print("SIGINT received. Stopping the queue.")
         running = False
     else:
-        print("Receiving SIGINT the second time. Exit.");
+        print("Receiving SIGINT the second time. Exit.")
         sys.exit(0)
 
 
-def load_backlight_tmr(config):
+def load_backlight_tmr(cfg):
     import importlib.util
 
     spec = importlib.util.find_spec('rpi_backlight')
@@ -785,11 +785,11 @@ def load_backlight_tmr(config):
         # Adding the module to sys.modules is optional.
         sys.modules['bl'] = bl
 
-    timeout_s = config.get("Backlight", "timeout")
-    brightness_s = config.get("Backlight", "brightness")
+    timeout_s = cfg.get("Backlight", "timeout")
+    brightness_s = cfg.get("Backlight", "brightness")
     back_tmr = BacklightTimer(bl,
-                              timeout = int(timeout_s),
-                              brightness = int(brightness_s))
+                              timeout=int(timeout_s),
+                              brightness=int(brightness_s))
     back_tmr.turn_on()
     back_tmr.start()
 
@@ -802,14 +802,19 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read("smartpanel.cfg")
 
-    fonts = ['./resources/FiraSans-Regular.ttf']
-    Config.set('kivy', 'default_font', fonts)
+    Config.set('kivy', 'default_font', [
+        ' FiraSans-Regular',
+        './resources/FiraSans-Regular.ttf',
+        './resources/FiraSans-Regular.ttf',
+        './resources/FiraSans-Regular.ttf',
+        './resources/FiraSans-Regular.ttf'
+    ])
 
-    if not "MQTT" in config.keys():
+    if "MQTT" not in config.keys():
         print("Missing MQTT section in configuration. See template for an example.")
         sys.exit(1)
     
-    MQTT_HOST = config.get("MQTT", "host");
+    MQTT_HOST = config.get("MQTT", "host")
     MQTT_SW_TOPIC = config.get("MQTT", "topic")
     MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
 
@@ -823,6 +828,3 @@ if __name__ == '__main__':
     app.run()
     
     client.loop_stop()
-
-
-# kate: space-indent on; indent-width 4; mixedindent off; indent-mode python; indend-pasted-text false; remove-trailing-space off
