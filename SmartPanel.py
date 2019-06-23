@@ -701,6 +701,66 @@ class PlayerWidget(RelativeLayout):
         self.state_is_reported = False
 
 
+Builder.load_string('''
+<FavButtonWidget>:
+    size: (100, 100)
+    size_hint: (None, None)
+
+    canvas:
+        # Border rect
+        Color:
+            rgba: self.base_color
+        Line:
+            rounded_rectangle: (2, 2, self.size[0]-4, self.size[1]-4, 20)
+            width: 2 
+
+    # Button
+    Image:
+        source: 'resources/hugging-face.png'
+        size: (64, 64)
+        size_hint: (None, None)
+        pos: (18, 18)
+        color: root.meta_color
+''')
+
+
+class FavButtonWidget(RelativeLayout):
+    base_color = ListProperty()
+    meta_color = ListProperty()
+
+    def __init__(self, cfg, mqttc, **kwargs):
+        self.base_color = RMColor.get_rgba("light blue")
+        self.meta_color = RMColor.get_rgba("light blue")
+
+        super(FavButtonWidget, self).__init__(**kwargs)
+
+        self.cfg = cfg
+        self.mqtt = mqttc
+
+        # True if the last action has resulted in a report back
+        self.state_is_reported = False
+
+        self.topic_base = self.cfg.get('Player', "topic")
+
+    def on_touch_down(self, touch):
+        if self.collide_point(touch.pos[0], touch.pos[1]):
+            tp = self.to_local(touch.pos[0], touch.pos[1])
+
+            def in_circle_bounds(center, radius, pt):
+                return (center[0]-pt[0])**2 + (center[1]-pt[1])**2 < radius**2
+
+            # check for main control
+            if in_circle_bounds([50, 50], 32, tp):
+                self.on_play_fav()
+
+            return True
+        else:
+            return super(FavButtonWidget, self).on_touch_down(touch)
+
+    def on_play_fav(self):
+        self.mqtt.publish(self.topic_base+"/CMD", "fav", qos=2)
+
+
 class SmartPanelWidget(RelativeLayout):
     def __init__(self, mqttc, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
@@ -733,6 +793,10 @@ class SmartPanelWidget(RelativeLayout):
         self.player = PlayerWidget(self.cfg, self.mqtt,
                                    pos=(330, 0))
         self.add_widget(self.player)
+
+        self.fav = FavButtonWidget(self.cfg, self.mqtt,
+                                   pos=(700, 220))
+        self.add_widget(self.fav)
 
     def on_touch_down(self, touch):
         if self.backlight_cb is not None and self.backlight_cb():
