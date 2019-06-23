@@ -794,6 +794,10 @@ class SmartPanelWidget(RelativeLayout):
                                    pos=(330, 0))
         self.add_widget(self.player)
 
+        self.fav = FavButtonWidget(self.cfg, self.mqtt,
+                                   pos=(700, 220))
+        self.add_widget(self.fav)
+
     def on_touch_down(self, touch):
         if self.backlight_cb is not None and self.backlight_cb():
             # Kill event when back-light is not active
