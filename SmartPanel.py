@@ -175,14 +175,18 @@ class Thing(RelativeLayout):
         self.mqtt = mqttc
         self.widget = widget
         
-        self.state = ThingState.UNKNOWN
-        self.state_color = self.get_state_color()
-
         section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
-        
+
+        self.color_on = self.cfg.get(section, "color_on", fallback="green")
+        self.color_off = self.cfg.get(section, "color_off", fallback="red")
+        self.color_neutral = self.cfg.get(section, "color_neutral", fallback="grey")
+
+        self.state = ThingState.UNKNOWN
+        self.state_color = self.get_state_color()
+
         mqtt_add_topic_callback(self.mqtt, self.get_state_topic(), self.on_pwr_state)
 
         super(Thing, self).__init__(pos=pos,
@@ -229,11 +233,11 @@ class Thing(RelativeLayout):
         print("Power {s} for {t}".format(t=topic, s=state))
 
     def get_state_color(self):
-        col = RMColor.get_rgba("grey")
+        col = RMColor.get_rgba(self.color_neutral)
         if self.state == ThingState.ON:
-            col = RMColor.get_rgba("green")
+            col = RMColor.get_rgba(self.color_on)
         if self.state == ThingState.OFF:
-            col = RMColor.get_rgba("red")
+            col = RMColor.get_rgba(self.color_off)
         
         return col
 
