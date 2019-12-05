@@ -136,6 +136,54 @@ class ThingState(Enum):
         return state
 
 
+class TasmotaDevice:
+    def __init__(self, cfg, section, mqttc, on_state=None):
+        self.cfg = cfg
+        self.mqtt = mqttc
+        self.on_state = on_state
+
+        self.tp = self.cfg.get(section, "type")
+        self.topic = self.cfg.get(section, "topic")
+
+        self.state = ThingState.UNKNOWN
+
+        self.mqtt_trigger = Clock.create_trigger(self._mqtt_toggle)
+
+        mqtt_add_topic_callback(self.mqtt, self._get_state_topic(), self._on_pwr_state)
+
+        # query the state
+        self.mqtt.publish(self.topic + "/cmnd/Power1", "?", qos=2)
+
+    def toggle(self):
+        self._set_state(ThingState.UNKNOWN)
+
+        self.mqtt_trigger()
+
+    def _set_state(self, state):
+        self.state = state
+        if self.on_state is not None:
+            self.on_state(self.state)
+
+    def _get_state_topic(self):
+        pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
+
+        return self.topic + pwr
+
+    def _mqtt_toggle(self, *_largs):
+        self.mqtt.publish(self.topic + "/cmnd/Power1", "TOGGLE", qos=2)
+
+        if self.tp == "TASMOTA WS2812":
+            sleep(1)
+            self.mqtt.publish(self.topic + "/cmnd/Power3", "TOGGLE", qos=2)
+
+    def _on_pwr_state(self, _client, _userdata, message):
+        topic = message.topic
+        state = str(message.payload)[2:-1]
+        self._set_state(ThingState.for_message(state))
+
+        print("Power {s} for {t}".format(t=topic, s=state))
+
+
 Builder.load_string('''
 <Thing>:
     font_size: self.size[1] * 2 / 5
