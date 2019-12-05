@@ -159,6 +159,9 @@ class TasmotaDevice:
 
         self.mqtt_trigger()
 
+    def get_state(self):
+        return self.state
+
     def _set_state(self, state):
         self.state = state
         if self.on_state is not None:
