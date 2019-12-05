@@ -187,6 +187,24 @@ class TasmotaDevice:
         print("Power {s} for {t}".format(t=topic, s=state))
 
 
+class StateColor:
+    def __init__(self, cfg, section):
+        self.cfg = cfg
+
+        self.color_on = self.cfg.get(section, "color_on", fallback="green")
+        self.color_off = self.cfg.get(section, "color_off", fallback="red")
+        self.color_neutral = self.cfg.get(section, "color_neutral", fallback="grey")
+
+    def get(self, state):
+        col = RMColor.get_rgba(self.color_neutral)
+        if state == TasmotaState.ON:
+            col = RMColor.get_rgba(self.color_on)
+        if state == TasmotaState.OFF:
+            col = RMColor.get_rgba(self.color_off)
+
+        return col
+
+
 Builder.load_string('''
 <Thing>:
     font_size: self.size[1] * 2 / 5
