@@ -119,21 +119,90 @@ class BacklightTimer:
         return dimmed
 
 
-class ThingState(Enum):
+class TasmotaState(Enum):
     UNKNOWN = 0
     OFF = 1
     ON = 2
 
     @staticmethod
     def for_message(msg):
-        state = ThingState.UNKNOWN
+        state = TasmotaState.UNKNOWN
         
         if msg == "ON":
-            state = ThingState.ON
+            state = TasmotaState.ON
         if msg == "OFF":
-            state = ThingState.OFF
+            state = TasmotaState.OFF
         
         return state
+
+
+class TasmotaDevice:
+    def __init__(self, cfg, section, mqttc, on_state=None):
+        self.cfg = cfg
+        self.mqtt = mqttc
+        self.on_state = on_state
+
+        self.tp = self.cfg.get(section, "type")
+        self.topic = self.cfg.get(section, "topic")
+
+        self.state = TasmotaState.UNKNOWN
+
+        self.mqtt_trigger = Clock.create_trigger(self._mqtt_toggle)
+
+        mqtt_add_topic_callback(self.mqtt, self._get_state_topic(), self._on_pwr_state)
+
+        # query the state
+        self.mqtt.publish(self.topic + "/cmnd/Power1", "?", qos=2)
+
+    def toggle(self):
+        self._set_state(TasmotaState.UNKNOWN)
+
+        self.mqtt_trigger()
+
+    def get_state(self):
+        return self.state
+
+    def _set_state(self, state):
+        self.state = state
+        if self.on_state is not None:
+            self.on_state(self.state)
+
+    def _get_state_topic(self):
+        pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
+
+        return self.topic + pwr
+
+    def _mqtt_toggle(self, *_largs):
+        self.mqtt.publish(self.topic + "/cmnd/Power1", "TOGGLE", qos=2)
+
+        if self.tp == "TASMOTA WS2812":
+            sleep(1)
+            self.mqtt.publish(self.topic + "/cmnd/Power3", "TOGGLE", qos=2)
+
+    def _on_pwr_state(self, _client, _userdata, message):
+        topic = message.topic
+        state = str(message.payload)[2:-1]
+        self._set_state(TasmotaState.for_message(state))
+
+        print("Power {s} for {t}".format(t=topic, s=state))
+
+
+class StateColor:
+    def __init__(self, cfg, section):
+        self.cfg = cfg
+
+        self.color_on = self.cfg.get(section, "color_on", fallback="green")
+        self.color_off = self.cfg.get(section, "color_off", fallback="red")
+        self.color_neutral = self.cfg.get(section, "color_neutral", fallback="grey")
+
+    def get(self, state):
+        col = RMColor.get_rgba(self.color_neutral)
+        if state == TasmotaState.ON:
+            col = RMColor.get_rgba(self.color_on)
+        if state == TasmotaState.OFF:
+            col = RMColor.get_rgba(self.color_off)
+
+        return col
 
 
 Builder.load_string('''
@@ -172,70 +241,30 @@ class Thing(RelativeLayout):
     def __init__(self, key, cfg, mqttc, widget, pos=(0, 0), **kwargs):
         self.key = key
         self.cfg = cfg
-        self.mqtt = mqttc
         self.widget = widget
         
-        self.state = ThingState.UNKNOWN
-        self.state_color = self.get_state_color()
-
         section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
-        self.tp = self.cfg.get(section, "type")
-        self.topic = self.cfg.get(section, "topic")
-        
-        mqtt_add_topic_callback(self.mqtt, self.get_state_topic(), self.on_pwr_state)
+
+        self.tasmota = TasmotaDevice(cfg, section, mqttc, self.on_state)
+
+        self.sc = StateColor(cfg, section)
+        self.on_state(TasmotaState.UNKNOWN)
 
         super(Thing, self).__init__(pos=pos,
                                     size=(300, 80), size_hint=(None, None),
                                     **kwargs)
 
-        self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
-        
-        # query the state
-        self.mqtt.publish(self.topic+"/cmnd/Power1", "?", qos=2)
-
-    def get_state_topic(self):
-        pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
-        
-        return self.topic+pwr
-
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
-            self.toggle()
+            self.tasmota.toggle()
 
             return True
         else:
             return super(Thing, self).on_touch_down(touch)
 
-    def toggle(self):
-        self.state = ThingState.UNKNOWN
-        self.state_color = self.get_state_color()
-
-        self.mqtt_trigger()
-
-    def mqtt_toggle(self, *_largs):
-        self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
-        
-        if self.tp == "TASMOTA WS2812":
-            sleep(1)
-            self.mqtt.publish(self.topic+"/cmnd/Power3", "TOGGLE", qos=2)
-
-    def on_pwr_state(self, _client, _userdata, message):
-        topic = message.topic
-        state = str(message.payload)[2:-1]
-        self.state = ThingState.for_message(state)
-        self.state_color = self.get_state_color()
-
-        print("Power {s} for {t}".format(t=topic, s=state))
-
-    def get_state_color(self):
-        col = RMColor.get_rgba("grey")
-        if self.state == ThingState.ON:
-            col = RMColor.get_rgba("green")
-        if self.state == ThingState.OFF:
-            col = RMColor.get_rgba("red")
-        
-        return col
+    def on_state(self, state):
+        self.state_color = self.sc.get(state)
 
 
 Builder.load_string('''
