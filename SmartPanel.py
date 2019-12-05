@@ -119,19 +119,19 @@ class BacklightTimer:
         return dimmed
 
 
-class ThingState(Enum):
+class TasmotaState(Enum):
     UNKNOWN = 0
     OFF = 1
     ON = 2
 
     @staticmethod
     def for_message(msg):
-        state = ThingState.UNKNOWN
+        state = TasmotaState.UNKNOWN
         
         if msg == "ON":
-            state = ThingState.ON
+            state = TasmotaState.ON
         if msg == "OFF":
-            state = ThingState.OFF
+            state = TasmotaState.OFF
         
         return state
 
@@ -145,7 +145,7 @@ class TasmotaDevice:
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
 
-        self.state = ThingState.UNKNOWN
+        self.state = TasmotaState.UNKNOWN
 
         self.mqtt_trigger = Clock.create_trigger(self._mqtt_toggle)
 
@@ -155,7 +155,7 @@ class TasmotaDevice:
         self.mqtt.publish(self.topic + "/cmnd/Power1", "?", qos=2)
 
     def toggle(self):
-        self._set_state(ThingState.UNKNOWN)
+        self._set_state(TasmotaState.UNKNOWN)
 
         self.mqtt_trigger()
 
@@ -179,7 +179,7 @@ class TasmotaDevice:
     def _on_pwr_state(self, _client, _userdata, message):
         topic = message.topic
         state = str(message.payload)[2:-1]
-        self._set_state(ThingState.for_message(state))
+        self._set_state(TasmotaState.for_message(state))
 
         print("Power {s} for {t}".format(t=topic, s=state))
 
@@ -231,7 +231,7 @@ class Thing(RelativeLayout):
         self.color_off = self.cfg.get(section, "color_off", fallback="red")
         self.color_neutral = self.cfg.get(section, "color_neutral", fallback="grey")
 
-        self.state = ThingState.UNKNOWN
+        self.state = TasmotaState.UNKNOWN
         self.state_color = self.get_state_color()
 
         super(Thing, self).__init__(pos=pos,
@@ -252,9 +252,9 @@ class Thing(RelativeLayout):
 
     def get_state_color(self):
         col = RMColor.get_rgba(self.color_neutral)
-        if self.state == ThingState.ON:
+        if self.state == TasmotaState.ON:
             col = RMColor.get_rgba(self.color_on)
-        if self.state == ThingState.OFF:
+        if self.state == TasmotaState.OFF:
             col = RMColor.get_rgba(self.color_off)
         
         return col
