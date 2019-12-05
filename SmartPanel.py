@@ -248,12 +248,8 @@ class Thing(RelativeLayout):
 
         self.tasmota = TasmotaDevice(cfg, section, mqttc, self.on_state)
 
-        self.color_on = self.cfg.get(section, "color_on", fallback="green")
-        self.color_off = self.cfg.get(section, "color_off", fallback="red")
-        self.color_neutral = self.cfg.get(section, "color_neutral", fallback="grey")
-
-        self.state = TasmotaState.UNKNOWN
-        self.state_color = self.get_state_color()
+        self.sc = StateColor(cfg, section)
+        self.on_state(TasmotaState.UNKNOWN)
 
         super(Thing, self).__init__(pos=pos,
                                     size=(300, 80), size_hint=(None, None),
@@ -268,17 +264,7 @@ class Thing(RelativeLayout):
             return super(Thing, self).on_touch_down(touch)
 
     def on_state(self, state):
-        self.state = state
-        self.state_color = self.get_state_color()
-
-    def get_state_color(self):
-        col = RMColor.get_rgba(self.color_neutral)
-        if self.state == TasmotaState.ON:
-            col = RMColor.get_rgba(self.color_on)
-        if self.state == TasmotaState.OFF:
-            col = RMColor.get_rgba(self.color_off)
-        
-        return col
+        self.state_color = self.sc.get(state)
 
 
 Builder.load_string('''
