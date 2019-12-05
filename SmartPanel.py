@@ -220,13 +220,12 @@ class Thing(RelativeLayout):
     def __init__(self, key, cfg, mqttc, widget, pos=(0, 0), **kwargs):
         self.key = key
         self.cfg = cfg
-        self.mqtt = mqttc
         self.widget = widget
         
         section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
-        self.tp = self.cfg.get(section, "type")
-        self.topic = self.cfg.get(section, "topic")
+
+        self.tasmota = TasmotaDevice(cfg, section, mqttc, self.on_state)
 
         self.color_on = self.cfg.get(section, "color_on", fallback="green")
         self.color_off = self.cfg.get(section, "color_off", fallback="red")
@@ -235,50 +234,21 @@ class Thing(RelativeLayout):
         self.state = ThingState.UNKNOWN
         self.state_color = self.get_state_color()
 
-        mqtt_add_topic_callback(self.mqtt, self.get_state_topic(), self.on_pwr_state)
-
         super(Thing, self).__init__(pos=pos,
                                     size=(300, 80), size_hint=(None, None),
                                     **kwargs)
 
-        self.mqtt_trigger = Clock.create_trigger(self.mqtt_toggle)
-        
-        # query the state
-        self.mqtt.publish(self.topic+"/cmnd/Power1", "?", qos=2)
-
-    def get_state_topic(self):
-        pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
-        
-        return self.topic+pwr
-
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
-            self.toggle()
+            self.tasmota.toggle()
 
             return True
         else:
             return super(Thing, self).on_touch_down(touch)
 
-    def toggle(self):
-        self.state = ThingState.UNKNOWN
+    def on_state(self, state):
+        self.state = state
         self.state_color = self.get_state_color()
-
-        self.mqtt_trigger()
-
-    def mqtt_toggle(self, *_largs):
-        self.mqtt.publish(self.topic+"/cmnd/Power1", "TOGGLE", qos=2)
-        
-        if self.tp == "TASMOTA WS2812":
-            sleep(1)
-            self.mqtt.publish(self.topic+"/cmnd/Power3", "TOGGLE", qos=2)
-
-    def on_pwr_state(self, _client, _userdata, message):
-        topic = message.topic
-        state = str(message.payload)[2:-1]
-        self.state = ThingState.for_message(state)
-        self.state_color = self.get_state_color()
-
-        print("Power {s} for {t}".format(t=topic, s=state))
 
     def get_state_color(self):
         col = RMColor.get_rgba(self.color_neutral)
