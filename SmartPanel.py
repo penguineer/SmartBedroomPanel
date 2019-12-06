@@ -188,12 +188,13 @@ class TasmotaDevice:
 
 
 class StateColor:
-    def __init__(self, cfg, section):
+    def __init__(self, cfg, section,
+                 default_on="green", default_off="red", default_neutral="grey"):
         self.cfg = cfg
 
-        self.color_on = self.cfg.get(section, "color_on", fallback="green")
-        self.color_off = self.cfg.get(section, "color_off", fallback="red")
-        self.color_neutral = self.cfg.get(section, "color_neutral", fallback="grey")
+        self.color_on = self.cfg.get(section, "color_on", fallback=default_on)
+        self.color_off = self.cfg.get(section, "color_off", fallback=default_off)
+        self.color_neutral = self.cfg.get(section, "color_neutral", fallback=default_neutral)
 
     def get(self, state):
         col = RMColor.get_rgba(self.color_neutral)
