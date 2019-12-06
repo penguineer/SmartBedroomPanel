@@ -881,6 +881,11 @@ class SmartPanelWidget(RelativeLayout):
                                    pos=(700, 220))
         self.add_widget(self.fav)
 
+        if "WifiRepeater" in self.cfg.sections():
+            self.wifi_repeater = WifiRepeater(self.cfg, self.mqtt,
+                                              pos=(700, 380))
+            self.add_widget(self.wifi_repeater)
+
     def on_touch_down(self, touch):
         if self.backlight_cb is not None and self.backlight_cb():
             # Kill event when back-light is not active
