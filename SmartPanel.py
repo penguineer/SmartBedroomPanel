@@ -154,10 +154,19 @@ class TasmotaDevice:
         # query the state
         self.mqtt.publish(self.topic + "/cmnd/Power1", "?", qos=2)
 
-    def toggle(self):
-        self._set_state(TasmotaState.UNKNOWN)
+        # if this is active, toggle actions will be ignored
+        self.throttled = False
 
-        self.mqtt_trigger()
+    def toggle(self):
+        if not self.throttled:
+            self._set_state(TasmotaState.UNKNOWN)
+            self.mqtt_trigger()
+
+            self.throttled = True
+            Clock.schedule_once(self._unthrottle, 0.5)
+
+    def _unthrottle(self, *_largs):
+        self.throttled = False
 
     def get_state(self):
         return self.state
