@@ -188,12 +188,13 @@ class TasmotaDevice:
 
 
 class StateColor:
-    def __init__(self, cfg, section):
+    def __init__(self, cfg, section,
+                 default_on="green", default_off="red", default_neutral="grey"):
         self.cfg = cfg
 
-        self.color_on = self.cfg.get(section, "color_on", fallback="green")
-        self.color_off = self.cfg.get(section, "color_off", fallback="red")
-        self.color_neutral = self.cfg.get(section, "color_neutral", fallback="grey")
+        self.color_on = self.cfg.get(section, "color_on", fallback=default_on)
+        self.color_off = self.cfg.get(section, "color_off", fallback=default_off)
+        self.color_neutral = self.cfg.get(section, "color_neutral", fallback=default_neutral)
 
     def get(self, state):
         col = RMColor.get_rgba(self.color_neutral)
@@ -262,6 +263,59 @@ class Thing(RelativeLayout):
             return True
         else:
             return super(Thing, self).on_touch_down(touch)
+
+    def on_state(self, state):
+        self.state_color = self.sc.get(state)
+
+
+Builder.load_string('''
+<WifiRepeater>:
+    size: (100, 100)
+    size_hint: (None, None)
+
+    canvas:
+        # Border rect
+        Color:
+            rgba: self.state_color
+        Line:
+            rounded_rectangle: (2, 2, self.size[0]-4, self.size[1]-4, 20)
+            width: 2 
+
+    # Button
+    Image:
+        source: 'resources/wifi_repeater.png'
+        size: (64, 64)
+        size_hint: (None, None)
+        pos: (18, 18)
+        color: root.state_color
+''')
+
+
+class WifiRepeater(RelativeLayout):
+    state_color = ListProperty()
+
+    def __init__(self, cfg, mqttc, pos=(0, 0), **kwargs):
+        self.cfg = cfg
+
+        section = "WifiRepeater"
+
+        self.tasmota = TasmotaDevice(cfg, section, mqttc, self.on_state)
+
+        self.sc = StateColor(cfg, section,
+                             default_on="light blue",
+                             default_off="grey")
+        self.on_state(TasmotaState.UNKNOWN)
+
+        super(WifiRepeater, self).__init__(pos=pos,
+                                           **kwargs)
+
+    def on_touch_down(self, touch):
+        if self.collide_point(touch.pos[0], touch.pos[1]):
+            self.tasmota.toggle()
+
+            return True
+        else:
+            return super(WifiRepeater, self).on_touch_down(touch)
 
     def on_state(self, state):
         self.state_color = self.sc.get(state)
@@ -826,6 +880,11 @@ class SmartPanelWidget(RelativeLayout):
         self.fav = FavButtonWidget(self.cfg, self.mqtt,
                                    pos=(700, 220))
         self.add_widget(self.fav)
+
+        if "WifiRepeater" in self.cfg.sections():
+            self.wifi_repeater = WifiRepeater(self.cfg, self.mqtt,
+                                              pos=(700, 380))
+            self.add_widget(self.wifi_repeater)
 
     def on_touch_down(self, touch):
         if self.backlight_cb is not None and self.backlight_cb():
