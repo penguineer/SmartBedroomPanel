@@ -16,5 +16,9 @@ color_on = "green"
 color_off = "red"
 color_neutral = "grey"
 
+[WifiRepeater]
+topic =
+type = TASMOTA Simple | TASMOTA WS2812
+
 [Player]
 topic =
