@@ -34,6 +34,9 @@ class RMColor:
         # grey is fallback
         c = (77, 77, 76, 256)
 
+        if name == "off" or name == "black":
+            c = (0, 0, 0, 256)
+
         if name == "fresh" or name == "light blue":
             c = (0, 132, 176, 256)
 
