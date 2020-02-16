@@ -225,7 +225,7 @@ class StateColor:
         if state == TasmotaState.OFF:
             idx = 2
 
-        return RMColor.get_rgba(colors[idx])
+        return RMColor.get_rgba(colors[idx], alpha=(1 if el != "background" else 0.8))
 
 
 Builder.load_string('''
@@ -239,15 +239,19 @@ Builder.load_string('''
     canvas:
         Color:
             rgba: self.state_color
-        Rectangle:
-            size: (self.size[1] * 5 / 7, self.size[1])
+        RoundedRectangle:
+            pos: (2, 2)
+            size: (self.size[0] , self.size[1] - 4)
+            radius: [20,]
+        Color:
+            rgba: self.border_color
         Line:
             rounded_rectangle: (2, 2, self.size[0], self.size[1] - 4, 20)
             width: 2
 
     Label:
         text: root.name
-        color: root.state_color
+        color: root.text_color
         pos: (root.text_x, 0)
         text_size: (root.text_s_x, root.text_s_y)
         font_size: root.font_size
@@ -258,7 +262,9 @@ Builder.load_string('''
 
 
 class Thing(RelativeLayout):
+    border_color = ListProperty()
     state_color = ListProperty()
+    text_color = ListProperty()
     name = StringProperty("<None>")
 
     def __init__(self, key, cfg, mqttc, widget, pos=(0, 0), **kwargs):
@@ -287,7 +293,9 @@ class Thing(RelativeLayout):
             return super(Thing, self).on_touch_down(touch)
 
     def on_state(self, state):
-        self.state_color = self.sc.get(state)
+        self.border_color = self.sc.get(state, el="border")
+        self.text_color = self.sc.get(state, el="text")
+        self.state_color = self.sc.get(state, el="background")
 
 
 Builder.load_string('''
