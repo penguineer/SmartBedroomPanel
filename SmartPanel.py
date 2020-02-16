@@ -208,14 +208,24 @@ class StateColor:
         self.color_off = self.cfg.get(section, "color_off", fallback=default_off)
         self.color_neutral = self.cfg.get(section, "color_neutral", fallback=default_neutral)
 
-    def get(self, state):
-        col = RMColor.get_rgba(self.color_neutral)
-        if state == TasmotaState.ON:
-            col = RMColor.get_rgba(self.color_on)
-        if state == TasmotaState.OFF:
-            col = RMColor.get_rgba(self.color_off)
+        self.state_color = dict()
+        self.state_color['text'] = [self.color_neutral, self.color_off, self.color_on]
+        self.state_color['background'] = [self.color_off, self.color_on, self.color_off]
+        self.state_color['border'] = [self.color_neutral, self.color_on, self.color_on]
 
-        return col
+    def get(self, state, el=None):
+        if el in self.state_color.keys():
+            colors = self.state_color[el]
+        else:
+            colors = [self.color_neutral, self.color_on, self.color_off]
+
+        idx = 0
+        if state == TasmotaState.ON:
+            idx = 1
+        if state == TasmotaState.OFF:
+            idx = 2
+
+        return RMColor.get_rgba(colors[idx])
 
 
 Builder.load_string('''
