@@ -5,7 +5,6 @@
 
 # Author: Stefan Haun <tux@netz39.de>
 from builtins import staticmethod
-from enum import Enum
 
 from time import sleep
 import signal
@@ -122,21 +121,77 @@ class BacklightTimer:
         return dimmed
 
 
-class TasmotaState(Enum):
-    UNKNOWN = 0
-    OFF = 1
-    ON = 2
+class TasmotaOnlineState(object):
+    def __init__(self, cb=None):
+        self._online = None
+        self._cb = cb
 
-    @staticmethod
-    def for_message(msg):
-        state = TasmotaState.UNKNOWN
-        
-        if msg == "ON":
-            state = TasmotaState.ON
-        if msg == "OFF":
-            state = TasmotaState.OFF
-        
-        return state
+    def handle_message(self, message):
+        topic = message.topic
+
+        _old = self._online
+
+        if message.payload == b'Online':
+            self._online = True
+        elif message.payload == b'Offline':
+            self._online = False
+        else:
+            self._online = None
+            print("Unknown message for topic {}: {}".format(topic, message.payload))
+
+        if self._online != _old and self._cb is not None:
+            self._cb(self)
+
+    def online(self):
+        return self._online
+
+
+class TasmotaPowerState(object):
+    def __init__(self, cb=None):
+        self._observed = None
+        self._expected = None
+        self._cb = cb
+
+    def mqtt_pwr(self, pwr):
+        _old = self._observed
+
+        self._observed = pwr
+        self._expected = pwr
+
+        if _old != pwr and self._cb is not None:
+            self._cb(self)
+
+    def user_pwr(self, pwr):
+        _old = self._expected
+
+        self._expected = pwr
+
+        if _old != pwr and self._cb is not None:
+            self._cb(self)
+
+    def user_toggle(self):
+        self.user_pwr(self._expected is not True)
+
+    def expected(self):
+        return self._expected
+
+    def observed(self):
+        return self._observed
+
+    def observation_match(self):
+        return self._observed is not None and self._observed == self._expected
+
+    def handle_message(self, message):
+        topic = message.topic
+
+        state = str(message.payload)[2:-1]
+        if state == "ON":
+            self.mqtt_pwr(True)
+        elif state == "OFF":
+            self.mqtt_pwr(False)
+        else:
+            self.mqtt_pwr(None)
+            print("Unknown message for topic {}: {}".format(topic, message.payload))
 
 
 class TasmotaDevice:
@@ -148,11 +203,13 @@ class TasmotaDevice:
         self.tp = self.cfg.get(section, "type")
         self.topic = self.cfg.get(section, "topic")
 
-        self.state = TasmotaState.UNKNOWN
+        self.online_state = TasmotaOnlineState(cb=self._on_online_state)
+        self.pwr_state = TasmotaPowerState(cb=self._on_pwr_state)
 
         self.mqtt_trigger = Clock.create_trigger(self._mqtt_toggle)
 
-        mqtt_add_topic_callback(self.mqtt, self._get_state_topic(), self._on_pwr_state)
+        mqtt_add_topic_callback(self.mqtt, self._get_online_topic(), self._on_online_mqtt)
+        mqtt_add_topic_callback(self.mqtt, self._get_pwr_topic(), self._on_pwr_mqtt)
 
         # query the state
         self.mqtt.publish(self.topic + "/cmnd/Power1", "?", qos=2)
@@ -165,21 +222,22 @@ class TasmotaDevice:
             self.throttled = True
             Clock.schedule_once(self._unthrottle, 0.5)
 
-            self._set_state(TasmotaState.UNKNOWN)
+            self.pwr_state.user_toggle()
             self.mqtt_trigger()
 
     def _unthrottle(self, *_largs):
         self.throttled = False
 
-    def get_state(self):
-        return self.state
+    def get_online_state(self):
+        return self.online_state
 
-    def _set_state(self, state):
-        self.state = state
-        if self.on_state is not None:
-            self.on_state(self.state)
+    def get_pwr_state(self):
+        return self.pwr_state
 
-    def _get_state_topic(self):
+    def _get_online_topic(self):
+        return self.topic + "/LWT"
+
+    def _get_pwr_topic(self):
         pwr = "/POWER1" if self.tp == "TASMOTA WS2812" else "/POWER"
 
         return self.topic + pwr
@@ -191,12 +249,19 @@ class TasmotaDevice:
             sleep(1)
             self.mqtt.publish(self.topic + "/cmnd/Power3", "TOGGLE", qos=2)
 
-    def _on_pwr_state(self, _client, _userdata, message):
-        topic = message.topic
-        state = str(message.payload)[2:-1]
-        self._set_state(TasmotaState.for_message(state))
+    def _on_online_mqtt(self, _client, _userdata, message):
+        self.online_state.handle_message(message)
 
-        print("Power {s} for {t}".format(t=topic, s=state))
+    def _on_pwr_mqtt(self, _client, _userdata, message):
+        self.pwr_state.handle_message(message)
+
+    def _on_online_state(self, _state):
+        if self.on_state:
+            self.on_state(self)
+
+    def _on_pwr_state(self, _state):
+        if self.on_state:
+            self.on_state(self)
 
 
 class StateColor:
@@ -209,11 +274,11 @@ class StateColor:
         self.color_neutral = self.cfg.get(section, "color_neutral", fallback=default_neutral)
 
     def get(self, state):
-        col = RMColor.get_rgba(self.color_neutral)
-        if state == TasmotaState.ON:
-            col = RMColor.get_rgba(self.color_on)
-        if state == TasmotaState.OFF:
-            col = RMColor.get_rgba(self.color_off)
+        _pwr_state = state.get_pwr_state()
+        if not _pwr_state.observation_match():
+            col = RMColor.get_rgba(self.color_neutral)
+        else:
+            col = RMColor.get_rgba(self.color_on if _pwr_state.observed() else self.color_off)
 
         return col
 
@@ -259,10 +324,10 @@ class Thing(RelativeLayout):
         section = "Thing:"+self.key
         self.name = self.cfg.get(section, "name")
 
-        self.tasmota = TasmotaDevice(cfg, section, mqttc, self.on_state)
+        self.tasmota = TasmotaDevice(cfg, section, mqttc, on_state=self.on_state)
 
         self.sc = StateColor(cfg, section)
-        self.on_state(TasmotaState.UNKNOWN)
+        self.on_state(self.tasmota)
 
         super(Thing, self).__init__(pos=pos,
                                     size=(300, 80), size_hint=(None, None),
@@ -270,7 +335,8 @@ class Thing(RelativeLayout):
 
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
-            self.tasmota.toggle()
+            if self.tasmota.get_online_state().online():
+                self.tasmota.toggle()
 
             return True
         else:
@@ -311,12 +377,12 @@ class WifiRepeater(RelativeLayout):
 
         section = "WifiRepeater"
 
-        self.tasmota = TasmotaDevice(cfg, section, mqttc, self.on_state)
+        self.tasmota = TasmotaDevice(cfg, section, mqttc, on_state=self.on_state)
 
         self.sc = StateColor(cfg, section,
                              default_on="light blue",
                              default_off="grey")
-        self.on_state(TasmotaState.UNKNOWN)
+        self.on_state(self.tasmota)
 
         super(WifiRepeater, self).__init__(pos=pos,
                                            **kwargs)
