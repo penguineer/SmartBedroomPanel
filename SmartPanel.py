@@ -5,7 +5,6 @@
 
 # Author: Stefan Haun <tux@netz39.de>
 from builtins import staticmethod
-from enum import Enum
 
 from time import sleep
 import signal
@@ -256,11 +255,11 @@ class TasmotaDevice:
     def _on_pwr_mqtt(self, _client, _userdata, message):
         self.pwr_state.handle_message(message)
 
-    def _on_online_state(self, state):
+    def _on_online_state(self, _state):
         if self.on_state:
             self.on_state(self)
 
-    def _on_pwr_state(self, state):
+    def _on_pwr_state(self, _state):
         if self.on_state:
             self.on_state(self)
 
