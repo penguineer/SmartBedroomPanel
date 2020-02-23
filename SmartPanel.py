@@ -336,7 +336,8 @@ class Thing(RelativeLayout):
 
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
-            self.tasmota.toggle()
+            if self.tasmota.get_online_state().online():
+                self.tasmota.toggle()
 
             return True
         else:
