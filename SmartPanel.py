@@ -162,11 +162,11 @@ class TasmotaDevice:
 
     def toggle(self):
         if not self.throttled:
-            self._set_state(TasmotaState.UNKNOWN)
-            self.mqtt_trigger()
-
             self.throttled = True
             Clock.schedule_once(self._unthrottle, 0.5)
+
+            self._set_state(TasmotaState.UNKNOWN)
+            self.mqtt_trigger()
 
     def _unthrottle(self, *_largs):
         self.throttled = False
