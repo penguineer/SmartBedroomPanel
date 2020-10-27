@@ -1,3 +1,4 @@
 smartpanel.cfg
 .idea
 venv/
+__pycache__
