@@ -99,11 +99,8 @@ def sigint_handler(_signal, _frame):
         sys.exit(0)
 
 
-if __name__ == '__main__':
+def main():
     signal.signal(signal.SIGINT, sigint_handler)
-    
-    config = configparser.ConfigParser()
-    config.read("smartpanel.cfg")
 
     Config.set('kivy', 'default_font', [
         ' FiraSans-Regular',
@@ -113,9 +110,16 @@ if __name__ == '__main__':
         './resources/FiraSans-Regular.ttf'
     ])
 
+    config = configparser.ConfigParser()
+    config.read("smartpanel.cfg")
+
     client = mqtt.create_client(config)
 
     app = SmartPanelApp(client, config, backlight_cb=backlight.load_backlight_tmr(config))
     app.run()
-    
+
     client.loop_stop()
+
+
+if __name__ == '__main__':
+    main()
