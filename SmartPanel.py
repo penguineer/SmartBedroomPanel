@@ -19,26 +19,9 @@ from kivy.lang import Builder
 
 from kivy.clock import Clock
 
-import paho.mqtt.client as mqtt
-
+import mqtt
 from color import RMColor, StateColor
 import backlight
-
-
-MQTT_TOPICS = []
-
-
-def mqtt_add_topic_callback(mqttc, topic, cb):
-    mqttc.subscribe(topic)
-    MQTT_TOPICS.append(topic)
-    
-    mqttc.message_callback_add(topic, cb)
-
-
-def on_mqtt_connect(mqttc, _userdata, _flags, rc):
-    print("Connected with code %s" % rc)
-    for topic in MQTT_TOPICS:
-        mqttc.subscribe(topic)
 
 
 class TasmotaOnlineState(object):
@@ -128,8 +111,8 @@ class TasmotaDevice:
 
         self.mqtt_trigger = Clock.create_trigger(self._mqtt_toggle)
 
-        mqtt_add_topic_callback(self.mqtt, self._get_online_topic(), self._on_online_mqtt)
-        mqtt_add_topic_callback(self.mqtt, self._get_pwr_topic(), self._on_pwr_mqtt)
+        mqtt.add_topic_callback(self.mqtt, self._get_online_topic(), self._on_online_mqtt)
+        mqtt.add_topic_callback(self.mqtt, self._get_pwr_topic(), self._on_pwr_mqtt)
 
         # query the state
         self.mqtt.publish(self.topic + "/cmnd/Power1", "?", qos=2)
@@ -635,10 +618,10 @@ class PlayerWidget(RelativeLayout):
         self.state_is_reported = False
 
         self.topic_base = self.cfg.get('Player', "topic")
-        mqtt_add_topic_callback(self.mqtt,
+        mqtt.add_topic_callback(self.mqtt,
                                 self.topic_base+"/song/#",
                                 self.on_song_state)
-        mqtt_add_topic_callback(self.mqtt,
+        mqtt.add_topic_callback(self.mqtt,
                                 self.topic_base+"/player/#",
                                 self.on_player_state)
 
@@ -916,19 +899,7 @@ if __name__ == '__main__':
         './resources/FiraSans-Regular.ttf'
     ])
 
-    if "MQTT" not in config.keys():
-        print("Missing MQTT section in configuration. See template for an example.")
-        sys.exit(1)
-    
-    MQTT_HOST = config.get("MQTT", "host")
-    MQTT_SW_TOPIC = config.get("MQTT", "topic")
-    MQTT_TOPICS.append(MQTT_SW_TOPIC+"/#")
-
-    client = mqtt.Client()
-    client.on_connect = on_mqtt_connect
-    client.connect(MQTT_HOST, 1883, 60)
-#    client.subscribe(MQTT_SW_TOPIC+"/#")
-    client.loop_start()
+    client = mqtt.create_client(config)
 
     app = SmartPanelApp(client, config, backlight_cb=backlight.load_backlight_tmr(config))
     app.run()
