@@ -1,3 +1,3 @@
-Cython>=0.29.5
-Kivy==1.10.1
-paho-mqtt>=1.4.0
+Cython>=0.29.21
+Kivy==1.11.1
+paho-mqtt>=1.5.1
