@@ -13,8 +13,6 @@ from datetime import datetime
 
 import configparser
 
-from threading import Timer
-
 from kivy.app import App
 from kivy.config import Config
 from kivy.graphics import Color
@@ -25,6 +23,8 @@ from kivy.lang import Builder
 from kivy.clock import Clock
 
 import paho.mqtt.client as mqtt
+
+import backlight
 
 
 class RMColor:
@@ -78,47 +78,6 @@ def on_mqtt_connect(mqttc, _userdata, _flags, rc):
     print("Connected with code %s" % rc)
     for topic in MQTT_TOPICS:
         mqttc.subscribe(topic)
-
-
-class BacklightTimer:
-    def __init__(self, bl, timeout=30, brightness=128):
-        self.bl = bl
-        self.timeout = timeout
-        self.brightness = brightness
-
-        self.timer = None
-
-        self.bl.set_power(True)
-        self.bl.set_brightness(128)
-
-    def handle_timer(self):
-        print("Backlight timeout")
-        
-        self.bl.set_brightness(11, smooth=True, duration=0.5)
-        self.bl.set_power(False)
-    
-    def start(self):
-        self.timer = Timer(self.timeout, self.handle_timer)
-        self.timer.start()
-    
-    def cancel(self):
-        self.timer.cancel()
-        
-    def turn_on(self):
-        self.bl.set_power(True)
-        self.bl.set_brightness(self.brightness, smooth=True, duration=0.5)
-        
-    def reset(self):
-        self.timer.cancel()
-    
-        dimmed = not self.bl.get_power()
-    
-        if dimmed:
-            self.turn_on()
-        
-        self.start()
-        
-        return dimmed
 
 
 class TasmotaOnlineState(object):
@@ -1001,31 +960,6 @@ def sigint_handler(_signal, _frame):
         sys.exit(0)
 
 
-def load_backlight_tmr(cfg):
-    import importlib.util
-
-    spec = importlib.util.find_spec('rpi_backlight')
-    if spec is None:
-        print("can't find the rpi_backlight module")
-        return None
-    else:
-        # If you chose to perform the actual import ...
-        bl = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(bl)
-        # Adding the module to sys.modules is optional.
-        sys.modules['bl'] = bl
-
-    timeout_s = cfg.get("Backlight", "timeout")
-    brightness_s = cfg.get("Backlight", "brightness")
-    back_tmr = BacklightTimer(bl,
-                              timeout=int(timeout_s),
-                              brightness=int(brightness_s))
-    back_tmr.turn_on()
-    back_tmr.start()
-
-    return back_tmr.reset
-
-
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, sigint_handler)
     
@@ -1054,7 +988,7 @@ if __name__ == '__main__':
 #    client.subscribe(MQTT_SW_TOPIC+"/#")
     client.loop_start()
 
-    app = SmartPanelApp(client, config, backlight_cb=load_backlight_tmr(config))
+    app = SmartPanelApp(client, config, backlight_cb=backlight.load_backlight_tmr(config))
     app.run()
     
     client.loop_stop()
