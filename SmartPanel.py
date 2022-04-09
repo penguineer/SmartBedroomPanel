@@ -18,6 +18,7 @@ import backlight
 from clock import ClockWidget
 from thing import Thing, WifiRepeater
 from player import PlayerWidget, FavButtonWidget
+from environment import EnvironmentWidget
 
 
 class SmartPanelWidget(RelativeLayout):
@@ -56,6 +57,10 @@ class SmartPanelWidget(RelativeLayout):
         self.fav = FavButtonWidget(self.cfg, self.mqtt,
                                    pos=(700, 220))
         self.add_widget(self.fav)
+
+        self.environment = EnvironmentWidget(self.cfg, self.mqtt,
+                                             pos=(330, 220))
+        self.add_widget(self.environment)
 
         if "WifiRepeater" in self.cfg.sections():
             self.wifi_repeater = WifiRepeater(self.cfg, self.mqtt,
