@@ -22,3 +22,8 @@ type = TASMOTA Simple | TASMOTA WS2812
 
 [Player]
 topic =
+
+[Environment]
+temperature =
+humidity =
+air_quality =
