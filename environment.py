@@ -25,7 +25,7 @@ Builder.load_string('''
     # to r 0, g 0, b 0, a 0
     
 <EnvironmentWidget>:
-    size: (340, 260)
+    size: (340, 100)
     size_hint: (None, None)
 
     canvas:
@@ -37,79 +37,88 @@ Builder.load_string('''
             width: 2 
 
     BoxLayout:
-        orientation: 'horizontal'
+        orientation: 'vertical'
         size: (240, 240)
-        padding: 20
-        spacing: 30
+        padding: 10
+        spacing: 10
 
-        GridLayout:
-            cols: 3
+        BoxLayout:
+            orientation: 'horizontal'
             spacing: 10
             size_hint: (1, 1)
             
             Image:
                 source: 'resources/temperature.png'
                 color: root.temperature_label_color
-                size_hint: (None, 0.5)
-                size: (64, 96)            
+                size_hint: (None, 0.8)
+                size: (64, 64)            
     
             Label:
                 text: '--' if root.temperature is None else root.temperature 
                 color: root.temperature_value_color
-                font_size: 96
+                font_size: 40
                 font_name: 'resources/FiraMono-Regular.ttf'    
     
             Label:
                 text: '°C' 
                 color: root.temperature_value_color
-                font_size: 36
+                font_size: 24
                 halign: 'center'
                 valign: 'top'
                 size: (48, 48)
                 text_size: self.size
-                size_hint: (None, 0.5)
+                size_hint: (None, 1)
+    
+            Label:
+                size_hint: (0.2, None)
     
             Image:
                 source: 'resources/humidity.png'
                 color: root.humidity_label_color
-                size_hint: (None, 0.5)
-                size: (64, 96)            
+                size_hint: (None, 0.8)
+                size: (64, 64)            
     
             Label:
                 text: '--' if root.humidity is None else root.humidity 
                 color: root.humidity_value_color
-                font_size: 96
+                font_size: 40
                 font_name: 'resources/FiraMono-Regular.ttf'    
     
             Label:
                 text: '%' 
                 color: root.humidity_value_color
-                font_size: 36
+                font_size: 24
                 halign: 'center'
                 valign: 'top'
                 size: (48, 48)
                 text_size: self.size
-                size_hint: (None, 0.5)
+                size_hint: (None, 1)
             
         BoxLayout:
-            orientation: 'vertical'
-            size_hint: (0.1, 1)
+            orientation: 'horizontal'
+            size_hint: (1, 0.2)
             spacing: 2
             
+            Label:
+                size_hint: (0.2, 1)
+            
             BackgroundLabel:
-                background_color: root.quality_color_5
-
-            BackgroundLabel:
-                background_color: root.quality_color_4
-
-            BackgroundLabel:
-                background_color: root.quality_color_3
+                background_color: root.quality_color_1
 
             BackgroundLabel:
                 background_color: root.quality_color_2
 
             BackgroundLabel:
-                background_color: root.quality_color_1
+                background_color: root.quality_color_3
+
+            BackgroundLabel:
+                background_color: root.quality_color_4
+
+            BackgroundLabel:
+                background_color: root.quality_color_5
+
+            Label:
+                size_hint: (0.2, 1)
 
 ''')
 
@@ -178,7 +187,7 @@ class EnvironmentWidget(RelativeLayout):
             self.temperature_label_color = RMColor.get_rgba("reboot")
         else:
             t = round(float(temperature))
-            self.temperature = f"{t:02d}"
+            self.temperature = "{:02d}".format(t)
             self.temperature_value_color = RMColor.get_rgba(EnvironmentWidget.VALUE_COLOR)
             self.temperature_label_color = RMColor.get_rgba(EnvironmentWidget.LABEL_COLOR)
 
@@ -189,7 +198,7 @@ class EnvironmentWidget(RelativeLayout):
             self.humidity_label_color = RMColor.get_rgba("reboot")
         else:
             h = round(float(humidity))
-            self.humidity = f"{h:02d}"
+            self.humidity = "{:02d}".format(h)
             self.humidity_value_color = RMColor.get_rgba(EnvironmentWidget.VALUE_COLOR)
             self.humidity_label_color = RMColor.get_rgba(EnvironmentWidget.LABEL_COLOR)
 
