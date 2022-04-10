@@ -178,7 +178,7 @@ class EnvironmentWidget(RelativeLayout):
             self.temperature_label_color = RMColor.get_rgba("reboot")
         else:
             t = round(float(temperature))
-            self.temperature = f"{t:02d}"
+            self.temperature = "{:02d}".format(t)
             self.temperature_value_color = RMColor.get_rgba(EnvironmentWidget.VALUE_COLOR)
             self.temperature_label_color = RMColor.get_rgba(EnvironmentWidget.LABEL_COLOR)
 
@@ -189,7 +189,7 @@ class EnvironmentWidget(RelativeLayout):
             self.humidity_label_color = RMColor.get_rgba("reboot")
         else:
             h = round(float(humidity))
-            self.humidity = f"{h:02d}"
+            self.humidity = "{:02d}".format(h)
             self.humidity_value_color = RMColor.get_rgba(EnvironmentWidget.VALUE_COLOR)
             self.humidity_label_color = RMColor.get_rgba(EnvironmentWidget.LABEL_COLOR)
 
