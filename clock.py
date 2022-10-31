@@ -2,7 +2,7 @@ from datetime import datetime
 
 from kivy.lang import Builder
 from kivy.uix.relativelayout import RelativeLayout
-from kivy.properties import ListProperty, StringProperty, NumericProperty
+from kivy.properties import ListProperty, StringProperty, NumericProperty, ObjectProperty
 from kivy.clock import Clock
 
 from color import RMColor
@@ -11,6 +11,8 @@ Builder.load_string('''
 <ClockWidget>:
     size: (300, 260)
     size_hint: (None, None)
+    orientation: 'horizontal'
+    spacing: self.size[0] * 0.01  
 
     canvas:
         # Upper rounded rect
@@ -114,46 +116,32 @@ Builder.load_string('''
 
 
 class ClockWidget(RelativeLayout):
-    base_color = ListProperty()
+    base_color = ListProperty(RMColor.get_rgba("yellow"))
     clk_image_src_0 = StringProperty("")
     clk_image_src_1 = StringProperty("")
     clk_image_src_2 = StringProperty("")
     clk_image_src_3 = StringProperty("")
-    alarm_color = ListProperty()
+    alarm = StringProperty(None, allownone=True)
+    alarm_color = ListProperty(RMColor.get_rgba("reboot"))
     alarm_digit_alpha = NumericProperty(0)
     alarm_image_src_0 = StringProperty("")
     alarm_image_src_1 = StringProperty("")
     alarm_image_src_2 = StringProperty("")
     alarm_image_src_3 = StringProperty("")
     current_date = StringProperty("    -  -  ")
+    basepath = StringProperty("")
+    touch_cb = ObjectProperty(None, allownone=True)
 
-    def __init__(self, cfg, basepath, touch_cb=None, **kwargs):
-        self.base_color = RMColor.get_rgba("yellow")
-        self.alarm_color = RMColor.get_rgba("reboot")
-
-        self.orientation = 'horizontal'
-        self.spacing = self.size[0] * 0.01
+    def __init__(self, **kwargs):
         super(ClockWidget, self).__init__(**kwargs)
-        self.cfg = cfg
 
-        self.basepath = basepath
-
-        self.clk_image_src_0 = self.basepath + "off.png"
-        self.clk_image_src_1 = self.basepath + "off.png"
-        self.clk_image_src_2 = self.basepath + "off.png"
-        self.clk_image_src_3 = self.basepath + "off.png"
-
-        self.alarm = None
-
-        self.touch_cb = touch_cb
-
-        Clock.schedule_interval(self.set_clock, 1)
+        Clock.schedule_interval(lambda dt: self.set_clock(), 1)
 
     def set_alarm(self, alarm):
         """Alarm in the form of 'HH:MM'"""
         self.alarm = alarm
 
-    def set_clock(self, _):
+    def set_clock(self):
         datestr = str(datetime.now())
 
         self.current_date = datestr[0:10]
@@ -186,3 +174,6 @@ class ClockWidget(RelativeLayout):
             return True
         else:
             return super(ClockWidget, self).on_touch_down(touch)
+
+    def on_basepath(self, _instance, _value):
+        self.set_clock()
