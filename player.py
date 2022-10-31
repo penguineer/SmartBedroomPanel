@@ -1,6 +1,6 @@
 from kivy.lang import Builder
 from kivy.uix.relativelayout import RelativeLayout
-from kivy.properties import ListProperty, StringProperty
+from kivy.properties import ListProperty, StringProperty, ObjectProperty
 from kivy.clock import Clock
 
 import mqtt
@@ -312,22 +312,14 @@ Builder.load_string('''
 
 
 class FavButtonWidget(RelativeLayout):
-    base_color = ListProperty()
-    meta_color = ListProperty()
+    base_color = ListProperty(RMColor.get_rgba("light blue"))
+    meta_color = ListProperty(RMColor.get_rgba("light blue"))
 
-    def __init__(self, cfg, mqttc, **kwargs):
-        self.base_color = RMColor.get_rgba("light blue")
-        self.meta_color = RMColor.get_rgba("light blue")
+    cfg = ObjectProperty(None)
+    mqtt = ObjectProperty(None)
 
+    def __init__(self, **kwargs):
         super(FavButtonWidget, self).__init__(**kwargs)
-
-        self.cfg = cfg
-        self.mqtt = mqttc
-
-        # True if the last action has resulted in a report back
-        self.state_is_reported = False
-
-        self.topic_base = self.cfg.get('Player', "topic")
 
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
@@ -345,4 +337,5 @@ class FavButtonWidget(RelativeLayout):
             return super(FavButtonWidget, self).on_touch_down(touch)
 
     def on_play_fav(self):
-        self.mqtt.publish(self.topic_base + "/CMD", "fav", qos=2)
+        if self.mqtt and self.cfg:
+            self.mqtt.publish(self.cfg.get('Player', "topic") + "/CMD", "fav", qos=2)
