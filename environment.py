@@ -1,7 +1,7 @@
 """Display data about the room environment"""
 
 from kivy.lang import Builder
-from kivy.properties import StringProperty, ListProperty
+from kivy.properties import StringProperty, ListProperty, ObjectProperty
 from kivy.uix.relativelayout import RelativeLayout
 
 import mqtt
@@ -124,16 +124,16 @@ Builder.load_string('''
 
 
 class EnvironmentWidget(RelativeLayout):
-    base_color = ListProperty()
+    base_color = ListProperty(RMColor.get_rgba("base"))
     temperature_value_color = ListProperty()
     temperature_label_color = ListProperty()
     humidity_value_color = ListProperty()
     humidity_label_color = ListProperty()
-    quality_color_1 = ListProperty()
-    quality_color_2 = ListProperty()
-    quality_color_3 = ListProperty()
-    quality_color_4 = ListProperty()
-    quality_color_5 = ListProperty()
+    quality_color_1 = ListProperty(RMColor.get_rgba("reboot"))
+    quality_color_2 = ListProperty(RMColor.get_rgba("reboot"))
+    quality_color_3 = ListProperty(RMColor.get_rgba("reboot"))
+    quality_color_4 = ListProperty(RMColor.get_rgba("reboot"))
+    quality_color_5 = ListProperty(RMColor.get_rgba("reboot"))
 
     VALUE_COLOR = "fresh"
     LABEL_COLOR = "base"
@@ -142,21 +142,20 @@ class EnvironmentWidget(RelativeLayout):
     temperature = StringProperty("--")
     humidity = StringProperty("--")
 
-    def __init__(self, cfg, mqttc, **kwargs):
-        self.base_color = RMColor.get_rgba("base")
+    cfg = ObjectProperty(None)
+    mqtt = ObjectProperty(None)
+
+    def __init__(self, **kwargs):
         self._set_temperature(None)
         self._set_humidity(None)
-
-        self.quality_color_1 = RMColor.get_rgba("reboot")
-        self.quality_color_2 = RMColor.get_rgba("reboot")
-        self.quality_color_3 = RMColor.get_rgba("reboot")
-        self.quality_color_4 = RMColor.get_rgba("reboot")
-        self.quality_color_5 = RMColor.get_rgba("reboot")
-
         super(EnvironmentWidget, self).__init__(**kwargs)
 
-        self.cfg = cfg
-        self.mqtt = mqttc
+    def on_cfg(self, _instance, _value):
+        self.on_mqtt(_instance, _value)
+
+    def on_mqtt(self, _instance, _value):
+        if not self.cfg or not self.mqtt:
+            return
 
         mqtt.add_topic_callback(self.mqtt,
                                 self.cfg.get('Environment', "temperature"),
