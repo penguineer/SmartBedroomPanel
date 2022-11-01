@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+import asyncio
 # SmartPanel - Smart Home control panel
 # with Raspberry Pi and RPi Touch Screen
 
@@ -123,7 +123,7 @@ def sigint_handler(_signal, _frame):
         sys.exit(0)
 
 
-def main():
+async def main():
     signal.signal(signal.SIGINT, sigint_handler)
 
     Config.set('kivy', 'default_font', [
@@ -138,8 +138,11 @@ def main():
     config.read("smartpanel.cfg")
 
     app = SmartPanelApp(config, backlight_cb=backlight.load_backlight_tmr(config))
-    app.run()
+    await app.async_run()
 
 
 if __name__ == '__main__':
-    main()
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    asyncio.run(main())
