@@ -1,6 +1,6 @@
 from kivy.lang import Builder
 from kivy.uix.relativelayout import RelativeLayout
-from kivy.properties import ListProperty, StringProperty
+from kivy.properties import ListProperty, StringProperty, ObjectProperty
 from kivy.clock import Clock
 
 import mqtt
@@ -127,24 +127,22 @@ Builder.load_string('''
 
 
 class PlayerWidget(RelativeLayout):
-    base_color = ListProperty()
-    meta_color = ListProperty()
-    ctrl_color = ListProperty()
+    base_color = ListProperty(RMColor.get_rgba("light blue"))
+    meta_color = ListProperty(RMColor.get_rgba("reboot"))
+    ctrl_color = ListProperty(RMColor.get_rgba("reboot"))
     song_artist = StringProperty("<Artist>")
     song_album = StringProperty("<Album>")
     song_title = StringProperty("<Title>")
     player_control_source = StringProperty("")
     volume_text = StringProperty("100")
 
-    def __init__(self, cfg, mqttc, **kwargs):
-        self.base_color = RMColor.get_rgba("light blue")
-        self.meta_color = RMColor.get_rgba("reboot")
-        self.ctrl_color = RMColor.get_rgba("reboot")
+    cfg = ObjectProperty(None)
+    mqtt = ObjectProperty(None)
 
+    topic_base = StringProperty(None)
+
+    def __init__(self, **kwargs):
         super(PlayerWidget, self).__init__(**kwargs)
-
-        self.cfg = cfg
-        self.mqtt = mqttc
 
         self.metadata = dict()
         self._set_metadata('state', 'stop')
@@ -159,15 +157,22 @@ class PlayerWidget(RelativeLayout):
         # True if the last action has resulted in a report back
         self.state_is_reported = False
 
+        Clock.schedule_interval(self._player_ui_state, 0.2)
+
+    def on_cfg(self, _instance, _value):
         self.topic_base = self.cfg.get('Player', "topic")
+        self.on_mqtt(self, self.mqtt)
+
+    def on_mqtt(self, _instance, _value):
+        if self.topic_base is None or self.mqtt is None:
+            return
+
         mqtt.add_topic_callback(self.mqtt,
                                 self.topic_base + "/song/#",
                                 self.on_song_state)
         mqtt.add_topic_callback(self.mqtt,
                                 self.topic_base + "/player/#",
                                 self.on_player_state)
-
-        Clock.schedule_interval(self._player_ui_state, 0.2)
 
         # query the state
         self.mqtt.publish(self.topic_base + "/CMD", "query", qos=2)
@@ -256,6 +261,9 @@ class PlayerWidget(RelativeLayout):
             return super(PlayerWidget, self).on_touch_down(touch)
 
     def on_main_control(self):
+        if self.topic_base is None or self.mqtt is None:
+            return
+
         if not self._get_metadata('state') == "play":
             cmd = "play"
         else:
@@ -269,6 +277,9 @@ class PlayerWidget(RelativeLayout):
         self.state_is_reported = False
 
     def on_forward_control(self):
+        if self.topic_base is None or self.mqtt is None:
+            return
+
         self.mqtt.publish(self.topic_base + "/CMD", "next", qos=2)
         # call "play" so reset "single play" status
         self.mqtt.publish(self.topic_base + "/CMD", "play", qos=2)
@@ -276,6 +287,9 @@ class PlayerWidget(RelativeLayout):
         self.state_is_reported = False
 
     def on_adjust_volume(self, up):
+        if self.topic_base is None or self.mqtt is None:
+            return
+
         vol = min(self.volume_levels, key=lambda x: abs(x - self._get_metadata('volume', 0)))
         idx = self.volume_levels.index(vol)
 
@@ -312,22 +326,14 @@ Builder.load_string('''
 
 
 class FavButtonWidget(RelativeLayout):
-    base_color = ListProperty()
-    meta_color = ListProperty()
+    base_color = ListProperty(RMColor.get_rgba("light blue"))
+    meta_color = ListProperty(RMColor.get_rgba("light blue"))
 
-    def __init__(self, cfg, mqttc, **kwargs):
-        self.base_color = RMColor.get_rgba("light blue")
-        self.meta_color = RMColor.get_rgba("light blue")
+    cfg = ObjectProperty(None)
+    mqtt = ObjectProperty(None)
 
+    def __init__(self, **kwargs):
         super(FavButtonWidget, self).__init__(**kwargs)
-
-        self.cfg = cfg
-        self.mqtt = mqttc
-
-        # True if the last action has resulted in a report back
-        self.state_is_reported = False
-
-        self.topic_base = self.cfg.get('Player', "topic")
 
     def on_touch_down(self, touch):
         if self.collide_point(touch.pos[0], touch.pos[1]):
@@ -345,4 +351,5 @@ class FavButtonWidget(RelativeLayout):
             return super(FavButtonWidget, self).on_touch_down(touch)
 
     def on_play_fav(self):
-        self.mqtt.publish(self.topic_base + "/CMD", "fav", qos=2)
+        if self.mqtt and self.cfg:
+            self.mqtt.publish(self.cfg.get('Player', "topic") + "/CMD", "fav", qos=2)
