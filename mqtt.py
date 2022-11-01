@@ -1,4 +1,5 @@
 import socket
+import threading
 
 import paho.mqtt.client as mqtt
 
@@ -52,6 +53,8 @@ class MqttClient(RelativeLayout):
 
         self.subscriptions = dict()
 
+        self.lock = threading.Lock()
+
     def __del__(self):
         self._disconnect()
 
@@ -67,12 +70,14 @@ class MqttClient(RelativeLayout):
             self.icon_color = [77 / 256, 77 / 256, 76 / 256, 1]
 
     def subscribe(self, topic, cb):
-        self.subscriptions[topic] = cb
-        self._register_callback(topic, cb)
+        with self.lock:
+            self.subscriptions[topic] = cb
+            self._register_callback(topic, cb)
 
     def unsubscribe(self, topic):
-        if topic in self.subscriptions:
-            del self.subscriptions[topic]
+        with self.lock:
+            if topic in self.subscriptions:
+                del self.subscriptions[topic]
 
     def publish(self, topic, payload, qos=2):
         if self.backend:
@@ -116,8 +121,9 @@ class MqttClient(RelativeLayout):
         Logger.info("MQTT: Client connected with code %s", rc)
         self.status = "connected"
 
-        for topic, cb in self.subscriptions.items():
-            self._register_callback(topic, cb)
+        with self.lock:
+            for topic, cb in self.subscriptions.items():
+                self._register_callback(topic, cb)
 
     def _disconnect(self):
         if self.backend:
