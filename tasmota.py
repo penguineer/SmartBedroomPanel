@@ -1,8 +1,6 @@
 from kivy.clock import Clock
 from time import sleep
 
-import mqtt
-
 
 class TasmotaOnlineState(object):
     def __init__(self, cb=None):
@@ -91,8 +89,8 @@ class TasmotaDevice:
 
         self.mqtt_trigger = Clock.create_trigger(self._mqtt_toggle)
 
-        mqtt.add_topic_callback(self.mqtt, self._get_online_topic(), self._on_online_mqtt)
-        mqtt.add_topic_callback(self.mqtt, self._get_pwr_topic(), self._on_pwr_mqtt)
+        self.mqtt.subscribe(self._get_online_topic(), self._on_online_mqtt)
+        self.mqtt.subscribe(self._get_pwr_topic(), self._on_pwr_mqtt)
 
         # query the state
         self.mqtt.publish(self.topic + "/cmnd/Power1", "?", qos=2)

@@ -4,7 +4,6 @@ from kivy.lang import Builder
 from kivy.properties import StringProperty, ListProperty, ObjectProperty
 from kivy.uix.relativelayout import RelativeLayout
 
-import mqtt
 from color import RMColor
 
 Builder.load_string('''
@@ -157,15 +156,12 @@ class EnvironmentWidget(RelativeLayout):
         if not self.cfg or not self.mqtt:
             return
 
-        mqtt.add_topic_callback(self.mqtt,
-                                self.cfg.get('Environment', "temperature"),
-                                self._on_temperature_update)
-        mqtt.add_topic_callback(self.mqtt,
-                                self.cfg.get('Environment', "humidity"),
-                                self._on_humidity_update)
-        mqtt.add_topic_callback(self.mqtt,
-                                self.cfg.get('Environment', "air_quality"),
-                                self._on_air_quality_update)
+        self.mqtt.subscribe(self.cfg.get('Environment', "temperature"),
+                            self._on_temperature_update)
+        self.mqtt.subscribe(self.cfg.get('Environment', "humidity"),
+                            self._on_humidity_update)
+        self.mqtt.subscribe(self.cfg.get('Environment', "air_quality"),
+                            self._on_air_quality_update)
 
     def _on_temperature_update(self, _client, _userdata, message):
         payload = message.payload.decode("utf-8")
