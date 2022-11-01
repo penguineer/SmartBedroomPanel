@@ -16,6 +16,7 @@ from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.relativelayout import RelativeLayout
 
 import backlight
+from shelly import ShellyButton
 from thing import Thing, WifiRepeater
 
 Builder.load_string('''
@@ -24,6 +25,7 @@ Builder.load_string('''
 #:import EnvironmentWidget environment.EnvironmentWidget
 #:import FavButtonWidget player.FavButtonWidget
 #:import PlayerWidget player.PlayerWidget
+#:import ShellyButton shelly.ShellyButton
 
 <SmartPanelWidget>:
     MqttClient:
@@ -38,7 +40,7 @@ Builder.load_string('''
         touch_cb: None
         
     EnvironmentWidget:
-        pos: [330, 220]
+        pos: [330, 200]
         cfg: root.cfg
         mqtt: root.mqtt
         
@@ -48,7 +50,7 @@ Builder.load_string('''
         mqtt: root.mqtt
 
     FavButtonWidget:        
-        pos: [700, 220]
+        pos: [700, 200]
         cfg: root.cfg
         mqtt: root.mqtt
 ''')
@@ -81,6 +83,15 @@ class SmartPanelWidget(RelativeLayout):
             t = Thing(section, self.cfg, self.mqtt, self, pos=(pos_x, pos_y))
             self.things.append(t)
             self.add_widget(t)
+
+        for sec in filter(lambda s: s.startswith("Shelly"),
+                          self.cfg.sections()):
+            sb = ShellyButton(cfg_name=sec,
+                              cfg=self.cfg,
+                              mqtt=self.mqtt)
+            self.bind(cfg=sb.setter('cfg'))
+            self.bind(mqtt=sb.setter('mqtt'))
+            self.add_widget(sb)
 
         if "WifiRepeater" in self.cfg.sections():
             self.wifi_repeater = WifiRepeater(self.cfg, self.mqtt,
