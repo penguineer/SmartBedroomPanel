@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+import asyncio
 # SmartPanel - Smart Home control panel
 # with Raspberry Pi and RPi Touch Screen
 
@@ -15,17 +15,22 @@ from kivy.lang import Builder
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.relativelayout import RelativeLayout
 
-import mqtt
 import backlight
 from thing import Thing, WifiRepeater
 
 Builder.load_string('''
+#:import MqttClient mqtt.MqttClient
 #:import ClockWidget clock.ClockWidget
 #:import EnvironmentWidget environment.EnvironmentWidget
 #:import FavButtonWidget player.FavButtonWidget
 #:import PlayerWidget player.PlayerWidget
 
 <SmartPanelWidget>:
+    MqttClient:
+        id: mqtt
+        cfg: root.cfg
+        pos: [800-32, 460-48]
+
     ClockWidget:
         pos: [0, 200]
         cfg: root.cfg
@@ -56,14 +61,14 @@ class SmartPanelWidget(RelativeLayout):
 
     IMGDIR = StringProperty("resources/nixie/")
 
-    def __init__(self, mqttc, cfg, backlight_cb=None, **kwargs):
+    def __init__(self, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
 
         self.backlight_cb = backlight_cb
 
         self.cfg = cfg
         
-        self.mqtt = mqttc
+        self.mqtt = self.ids.mqtt
 
         # Initialize the things
         self.things = []
@@ -91,15 +96,14 @@ class SmartPanelWidget(RelativeLayout):
 
 
 class SmartPanelApp(App):
-    def __init__(self, mqttc, cfg, backlight_cb, **kwargs):
+    def __init__(self, cfg, backlight_cb, **kwargs):
         super(SmartPanelApp, self).__init__(**kwargs)
         
-        self.mqtt = mqttc
         self.cfg = cfg
         self.backlight_cb = backlight_cb
 
     def build(self):
-        widget = SmartPanelWidget(self.mqtt, self.cfg, backlight_cb=self.backlight_cb,
+        widget = SmartPanelWidget(self.cfg, backlight_cb=self.backlight_cb,
                                   size=(800, 480))
         
         return widget
@@ -119,7 +123,7 @@ def sigint_handler(_signal, _frame):
         sys.exit(0)
 
 
-def main():
+async def main():
     signal.signal(signal.SIGINT, sigint_handler)
 
     Config.set('kivy', 'default_font', [
@@ -133,13 +137,12 @@ def main():
     config = configparser.ConfigParser()
     config.read("smartpanel.cfg")
 
-    client = mqtt.create_client(config)
-
-    app = SmartPanelApp(client, config, backlight_cb=backlight.load_backlight_tmr(config))
-    app.run()
-
-    client.loop_stop()
+    app = SmartPanelApp(config, backlight_cb=backlight.load_backlight_tmr(config))
+    await app.async_run()
 
 
 if __name__ == '__main__':
-    main()
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    asyncio.run(main())

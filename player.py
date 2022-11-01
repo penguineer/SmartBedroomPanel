@@ -3,7 +3,6 @@ from kivy.uix.relativelayout import RelativeLayout
 from kivy.properties import ListProperty, StringProperty, ObjectProperty
 from kivy.clock import Clock
 
-import mqtt
 from color import RMColor
 
 Builder.load_string('''
@@ -167,12 +166,10 @@ class PlayerWidget(RelativeLayout):
         if self.topic_base is None or self.mqtt is None:
             return
 
-        mqtt.add_topic_callback(self.mqtt,
-                                self.topic_base + "/song/#",
-                                self.on_song_state)
-        mqtt.add_topic_callback(self.mqtt,
-                                self.topic_base + "/player/#",
-                                self.on_player_state)
+        self.mqtt.subscribe(self.topic_base + "/song/#",
+                            self.on_song_state)
+        self.mqtt.subscribe(self.topic_base + "/player/#",
+                            self.on_player_state)
 
         # query the state
         self.mqtt.publish(self.topic_base + "/CMD", "query", qos=2)
@@ -188,26 +185,26 @@ class PlayerWidget(RelativeLayout):
         topic = message.topic
         payload = message.payload.decode("utf-8")
 
-        if mqtt.topic_matches_sub(self.topic_base + "/song/artist", topic):
+        if self.mqtt.topic_matches_sub(self.topic_base + "/song/artist", topic):
             self._set_metadata('artist', payload)
 
-        if mqtt.topic_matches_sub(self.topic_base + "/song/album", topic):
+        if self.mqtt.topic_matches_sub(self.topic_base + "/song/album", topic):
             self._set_metadata('album', payload)
 
-        if mqtt.topic_matches_sub(self.topic_base + "/song/title", topic):
+        if self.mqtt.topic_matches_sub(self.topic_base + "/song/title", topic):
             self._set_metadata('title', payload)
 
     def on_player_state(self, _client, _userdata, message):
         topic = message.topic
         payload = message.payload.decode("utf-8")
 
-        if mqtt.topic_matches_sub(self.topic_base + "/player/state", topic):
+        if self.mqtt.topic_matches_sub(self.topic_base + "/player/state", topic):
             self._set_metadata('state', payload)
 
-        if mqtt.topic_matches_sub(self.topic_base + "/player/single", topic):
+        if self.mqtt.topic_matches_sub(self.topic_base + "/player/single", topic):
             self._set_metadata('single', payload)
 
-        if mqtt.topic_matches_sub(self.topic_base + "/player/volume", topic):
+        if self.mqtt.topic_matches_sub(self.topic_base + "/player/volume", topic):
             self._set_metadata('volume', int(payload))
 
     def _player_ui_state(self, _dt):
