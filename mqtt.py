@@ -10,7 +10,7 @@ from kivy.uix.relativelayout import RelativeLayout
 Builder.load_string("""
 <MqttClient>:
     label: "MQTT"        
-    icon: "recources/mqtt_icon_64px.png"
+    icon: "resources/mqtt_icon_64px.png"
     size_hint: None, None
     size: 32, 48
 
@@ -55,7 +55,7 @@ class MqttClient(RelativeLayout):
     def __del__(self):
         self._disconnect()
 
-    def _on_conf(self, _instance, _value):
+    def _on_cfg(self, _instance, _value):
         self._connect()
 
     def _on_status(self, _instance, _value):
@@ -84,13 +84,16 @@ class MqttClient(RelativeLayout):
             Logger.warning("MQTT: %s", error)
 
     def _connect(self):
+        if self.cfg is None:
+            return
+
         self.status = None
         self.backend = None
 
         if not self.cfg:
             self._disconnect()
 
-        host = self.cfg.get("host", None)
+        host = self.cfg.get("MQTT", "host")
         if not host:
             self._log_error("Missing MQTT host configuration! See template for an example.")
             return
