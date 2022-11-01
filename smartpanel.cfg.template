@@ -16,6 +16,12 @@ color_on = "green"
 color_off = "red"
 color_neutral = "grey"
 
+[Shelly:name]
+topic =
+icon =
+posX =
+posY =
+
 [WifiRepeater]
 topic =
 type = TASMOTA Simple | TASMOTA WS2812
