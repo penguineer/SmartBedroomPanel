@@ -11,17 +11,51 @@ import configparser
 
 from kivy.app import App
 from kivy.config import Config
+from kivy.lang import Builder
+from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.relativelayout import RelativeLayout
 
 import mqtt
 import backlight
-from clock import ClockWidget
 from thing import Thing, WifiRepeater
-from player import PlayerWidget, FavButtonWidget
-from environment import EnvironmentWidget
+
+Builder.load_string('''
+#:import ClockWidget clock.ClockWidget
+#:import EnvironmentWidget environment.EnvironmentWidget
+#:import FavButtonWidget player.FavButtonWidget
+#:import PlayerWidget player.PlayerWidget
+
+<SmartPanelWidget>:
+    ClockWidget:
+        pos: [0, 200]
+        cfg: root.cfg
+        basepath: root.IMGDIR
+        touch_cb: None
+        
+    EnvironmentWidget:
+        pos: [330, 220]
+        cfg: root.cfg
+        mqtt: root.mqtt
+        
+    PlayerWidget:        
+        pos: [330, 0]
+        cfg: root.cfg
+        mqtt: root.mqtt
+
+    FavButtonWidget:        
+        pos: [700, 220]
+        cfg: root.cfg
+        mqtt: root.mqtt
+''')
 
 
 class SmartPanelWidget(RelativeLayout):
+    backlight_cb = ObjectProperty()
+    cfg = ObjectProperty()
+    mqtt = ObjectProperty()
+
+    IMGDIR = StringProperty("resources/nixie/")
+
     def __init__(self, mqttc, cfg, backlight_cb=None, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
 
@@ -42,25 +76,6 @@ class SmartPanelWidget(RelativeLayout):
             t = Thing(section, self.cfg, self.mqtt, self, pos=(pos_x, pos_y))
             self.things.append(t)
             self.add_widget(t)
-        
-        self.IMGDIR = "resources/nixie/"
-        clock_pos = (0, 220)
-        
-        self.clock = ClockWidget(self.cfg, self.IMGDIR,
-                                 pos=clock_pos, touch_cb=None)
-        self.add_widget(self.clock)
-
-        self.player = PlayerWidget(self.cfg, self.mqtt,
-                                   pos=(330, 0))
-        self.add_widget(self.player)
-
-        self.fav = FavButtonWidget(self.cfg, self.mqtt,
-                                   pos=(700, 220))
-        self.add_widget(self.fav)
-
-        self.environment = EnvironmentWidget(self.cfg, self.mqtt,
-                                             pos=(330, 220))
-        self.add_widget(self.environment)
 
         if "WifiRepeater" in self.cfg.sections():
             self.wifi_repeater = WifiRepeater(self.cfg, self.mqtt,
