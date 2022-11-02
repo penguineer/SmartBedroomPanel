@@ -1,68 +1,112 @@
-from threading import Timer
-import sys
+from contextlib import nullcontext
+
+from kivy.clock import Clock
+from kivy.properties import BoundedNumericProperty, DictProperty, BooleanProperty, ObjectProperty, NumericProperty
+from kivy.uix.widget import Widget
+from rpi_backlight import Backlight
+from rpi_backlight.utils import detect_board_type, FakeBacklightSysfs
 
 
-class BacklightTimer:
-    def __init__(self, bl, timeout=30, brightness=128):
-        self.bl = bl
-        self.timeout = timeout
-        self.brightness = brightness
+class BacklightControl(Widget):
+    conf = DictProperty(None, allownone=True)
+    cfg = ObjectProperty(None)
 
-        self.timer = None
+    brightness = BoundedNumericProperty(1, min=0, max=1)
+    timeout = NumericProperty(None, allownone=True)
+    power = BooleanProperty(None)
 
-        self.bl.set_power(True)
-        self.bl.set_brightness(128)
+    _backlight = ObjectProperty(None, allownone=True)
 
-    def handle_timer(self):
-        print("Backlight timeout")
+    def __init__(self, **kwargs):
+        super(BacklightControl, self).__init__(**kwargs)
 
-        self.bl.set_brightness(11, smooth=True, duration=0.5)
-        self.bl.set_power(False)
+        # Store the maximal brightness to avoid looking up the dict every time the brightness changes
+        self._max_br = 100
+        self._backlight_clock = None
+        self._timeout_clock = None
+        self.ctx = None
 
-    def start(self):
-        self.timer = Timer(self.timeout, self.handle_timer)
-        self.timer.start()
+        self.bind(conf=self._on_conf)
+        self.bind(brightness=self._on_brightness)
+        self.bind(power=self._on_power)
 
-    def cancel(self):
-        self.timer.cancel()
+        self.bind(_backlight=self._on_backlight)
 
-    def turn_on(self):
-        self.bl.set_power(True)
-        self.bl.set_brightness(self.brightness, smooth=True, duration=0.5)
+        Clock.schedule_once(lambda dt: self._setup())
 
-    def reset(self):
-        self.timer.cancel()
+    def __del__(self):
+        self._cancel_backlight_clock()
+        if self.ctx:
+            self.ctx.__exit__()
 
-        dimmed = not self.bl.get_power()
+    def on_cfg(self, _instance, _value):
+        # cache maximal brightness setting
+        self._max_br = min(100, int(self.cfg.get("Backlight", "brightness", fallback=100)) if self.cfg else 100)
+        # update, if switched on
+        if self.power:
+            self._on_brightness(_instance, None)
 
-        if dimmed:
-            self.turn_on()
+        self.timeout = self.cfg.get("Backlight", "timeout", fallback=None) if self.cfg else None
 
-        self.start()
+    def _on_conf(self, _instance, _value):
+        # cache maximal brightness setting
+        self._max_br = min(100, self.conf.get("brightness", 100) if self.conf else 100)
+        # update, if switched on
+        if self.power:
+            self._on_brightness(_instance, _value)
 
-        return dimmed
+    def _on_brightness(self, _instance, _value):
+        if self._backlight:
+            # Assume maximum brightness if none is set
+            br = self.brightness if self.brightness else 100
+            self._backlight.brightness = int(self._max_br * br)
 
+    def _on_power(self, _instance, _value):
+        if not self._backlight:
+            return
 
-def load_backlight_tmr(cfg):
-    import importlib.util
+        if self.power:
+            self._cancel_backlight_clock()
+            self._backlight.power = True
+            self._backlight.fade_duration = 0.2
+            self._start_timeout_clock()
+        else:
+            self._backlight.fade_duration = 0.7
+            self._backlight_clock = Clock.schedule_once(lambda dt: self._power_off(), timeout=0.75)
 
-    spec = importlib.util.find_spec('rpi_backlight')
-    if spec is None:
-        print("can't find the rpi_backlight module")
-        return None
-    else:
-        # If you chose to perform the actual import ...
-        bl = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(bl)
-        # Adding the module to sys.modules is optional.
-        sys.modules['bl'] = bl
+        self._backlight.brightness = self._max_br if self.power else 0
 
-    timeout_s = cfg.get("Backlight", "timeout")
-    brightness_s = cfg.get("Backlight", "brightness")
-    back_tmr = BacklightTimer(bl,
-                              timeout=int(timeout_s),
-                              brightness=int(brightness_s))
-    back_tmr.turn_on()
-    back_tmr.start()
+    def _power_off(self):
+        self.power = False
 
-    return back_tmr.reset
+    def _cancel_backlight_clock(self):
+        if self._backlight_clock:
+            self._backlight_clock.cancel()
+            self._backlight_clock = None
+
+    def _start_timeout_clock(self):
+        if self._timeout_clock is not None:
+            self._timeout_clock.cancel()
+            self._timeout_clock = None
+
+        if self.timeout:
+            self._timeout_clock = Clock.schedule_once(lambda dt: self.setter('power')(self, False),
+                                                      timeout=self.timeout)
+
+    def _on_backlight(self, _instance, _value):
+        if self._backlight:
+            # Dispatch the other properties
+            for p in ['brightness', 'power']:
+                self.property(p).dispatch(self)
+
+    def _setup(self):
+        bt = detect_board_type()
+        # This allows us to fake a Raspberry Pi
+        if bt is None:
+            self.ctx = FakeBacklightSysfs()
+            self.ctx.__enter__()
+            self._backlight = Backlight(backlight_sysfs_path=self.ctx.path)
+        else:
+            self.ctx = nullcontext()
+            self.ctx.__enter__()
+            self._backlight = Backlight()
