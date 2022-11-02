@@ -73,15 +73,13 @@ class SmartPanelWidget(RelativeLayout):
         self.mqtt = self.ids.mqtt
 
         # Initialize the things
-        self.things = []
         for sec in filter(lambda s: s.startswith("Thing:"),
                           self.cfg.sections()):
-            section = sec[6:]
-            pos_x = int(self.cfg.get("Thing:"+section, "posX"))
-            pos_y = int(self.cfg.get("Thing:"+section, "posY"))
-
-            t = Thing(section, self.cfg, self.mqtt, self, pos=(pos_x, pos_y))
-            self.things.append(t)
+            t = Thing(cfg_name=sec,
+                      cfg=self.cfg,
+                      mqtt=self.mqtt)
+            self.bind(cfg=t.setter('cfg'))
+            self.bind(mqtt=t.setter('mqtt'))
             self.add_widget(t)
 
         for sec in filter(lambda s: s.startswith("Shelly"),
