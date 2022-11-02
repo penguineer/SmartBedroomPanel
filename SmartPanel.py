@@ -15,11 +15,11 @@ from kivy.lang import Builder
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.relativelayout import RelativeLayout
 
-import backlight
 from shelly import ShellyButton
 from thing import Thing, WifiRepeater
 
 Builder.load_string('''
+#:import BacklightControl backlight.BacklightControl
 #:import MqttClient mqtt.MqttClient
 #:import ClockWidget clock.ClockWidget
 #:import EnvironmentWidget environment.EnvironmentWidget
@@ -28,6 +28,11 @@ Builder.load_string('''
 #:import ShellyButton shelly.ShellyButton
 
 <SmartPanelWidget>:
+    BacklightControl:
+        id: backlight
+        cfg: root.cfg
+        power: True        
+
     MqttClient:
         id: mqtt
         cfg: root.cfg
@@ -57,16 +62,13 @@ Builder.load_string('''
 
 
 class SmartPanelWidget(RelativeLayout):
-    backlight_cb = ObjectProperty()
     cfg = ObjectProperty()
     mqtt = ObjectProperty()
 
     IMGDIR = StringProperty("resources/nixie/")
 
-    def __init__(self, cfg, backlight_cb=None, **kwargs):
+    def __init__(self, cfg, **kwargs):
         super(SmartPanelWidget, self).__init__(**kwargs)
-
-        self.backlight_cb = backlight_cb
 
         self.cfg = cfg
         
@@ -97,22 +99,25 @@ class SmartPanelWidget(RelativeLayout):
             self.add_widget(self.wifi_repeater)
 
     def on_touch_down(self, touch):
-        if self.backlight_cb is not None and self.backlight_cb():
+        if self.ids.backlight is not None and not self.ids.backlight.power:
+            block = not self.ids.backlight.power
+            # Switch on
+            self.ids.backlight.power = True
             # Kill event when back-light is not active
-            return True
-        else:
-            return super(SmartPanelWidget, self).on_touch_down(touch)
+            if block:
+                return True
+
+        return super(SmartPanelWidget, self).on_touch_down(touch)
 
 
 class SmartPanelApp(App):
-    def __init__(self, cfg, backlight_cb, **kwargs):
+    def __init__(self, cfg, **kwargs):
         super(SmartPanelApp, self).__init__(**kwargs)
         
         self.cfg = cfg
-        self.backlight_cb = backlight_cb
 
     def build(self):
-        widget = SmartPanelWidget(self.cfg, backlight_cb=self.backlight_cb,
+        widget = SmartPanelWidget(self.cfg,
                                   size=(800, 480))
         
         return widget
@@ -146,7 +151,7 @@ async def main():
     config = configparser.ConfigParser()
     config.read("smartpanel.cfg")
 
-    app = SmartPanelApp(config, backlight_cb=backlight.load_backlight_tmr(config))
+    app = SmartPanelApp(config)
     await app.async_run()
 
 
